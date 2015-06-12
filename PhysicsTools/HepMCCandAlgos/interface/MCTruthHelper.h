@@ -561,62 +561,62 @@ namespace MCTruthHelper {
   }
   
   //////////////////////////////////////////////////////////////
-  int pdgId(const reco::GenParticle &p) {
+  inline int pdgId(const reco::GenParticle &p) {
     return p.pdgId();
   }
 
   //////////////////////////////////////////////////////////////
-  int pdgId(const HepMC::GenParticle &p) {
+  inline int pdgId(const HepMC::GenParticle &p) {
     return p.pdg_id();
   }  
   
   //////////////////////////////////////////////////////////////
-  int absPdgId(const reco::GenParticle &p) {
+  inline int absPdgId(const reco::GenParticle &p) {
     return std::abs(p.pdgId());
   }
 
   //////////////////////////////////////////////////////////////
-  int absPdgId(const HepMC::GenParticle &p) {
+  inline int absPdgId(const HepMC::GenParticle &p) {
     return std::abs(p.pdg_id());
   }
   
   /////////////////////////////////////////////////////////////////////////////
-  unsigned int numberOfMothers(const reco::GenParticle &p) {
+  inline unsigned int numberOfMothers(const reco::GenParticle &p) {
     return p.numberOfMothers();
   }
   
   /////////////////////////////////////////////////////////////////////////////
-  unsigned int numberOfMothers(const HepMC::GenParticle &p) {
+  inline unsigned int numberOfMothers(const HepMC::GenParticle &p) {
     return p.production_vertex() ? p.production_vertex()->particles_in_size() : 0;
   }
   
   /////////////////////////////////////////////////////////////////////////////
-  const reco::GenParticle *mother(const reco::GenParticle &p, unsigned int imoth) {
+  inline const reco::GenParticle *mother(const reco::GenParticle &p, unsigned int imoth) {
     return static_cast<const reco::GenParticle*>(p.mother(imoth));
   }
   
   /////////////////////////////////////////////////////////////////////////////
-  const HepMC::GenParticle *mother(const HepMC::GenParticle &p, unsigned int imoth) {
+  inline const HepMC::GenParticle *mother(const HepMC::GenParticle &p, unsigned int imoth) {
     return p.production_vertex() && p.production_vertex()->particles_in_size() ? *(p.production_vertex()->particles_in_const_begin() + imoth) : 0;
   }
   
   /////////////////////////////////////////////////////////////////////////////
-  unsigned int numberOfDaughters(const reco::GenParticle &p) {
+  inline unsigned int numberOfDaughters(const reco::GenParticle &p) {
     return p.numberOfDaughters();
   }
   
   /////////////////////////////////////////////////////////////////////////////
-  unsigned int numberOfDaughters(const HepMC::GenParticle &p) {
+  inline unsigned int numberOfDaughters(const HepMC::GenParticle &p) {
     return p.end_vertex() ? p.end_vertex()->particles_out_size() : 0;
   }
   
   /////////////////////////////////////////////////////////////////////////////
-  const reco::GenParticle *daughter(const reco::GenParticle &p, unsigned int idau) {
+  inline const reco::GenParticle *daughter(const reco::GenParticle &p, unsigned int idau) {
     return static_cast<const reco::GenParticle*>(p.daughter(idau));
   }
   
   /////////////////////////////////////////////////////////////////////////////
-  const HepMC::GenParticle *daughter(const HepMC::GenParticle &p, unsigned int idau) {
+  inline const HepMC::GenParticle *daughter(const HepMC::GenParticle &p, unsigned int idau) {
     return *(p.end_vertex()->particles_out_const_begin() + idau);
   }
   
