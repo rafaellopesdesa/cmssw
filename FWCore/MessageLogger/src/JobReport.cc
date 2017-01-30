@@ -368,7 +368,7 @@ namespace edm {
       }
       *(impl_->ost_) << "</ChildProcessFiles>\n";
       *(impl_->ost_) << "</FrameworkJobReport>\n";
-      std::ofstream* p = dynamic_cast<std::ofstream *>(impl_->ost_);
+      std::ofstream* p = dynamic_cast<std::ofstream *>(impl_->ost());
       if(p) {
         p->close();
       }
@@ -381,7 +381,7 @@ namespace edm {
 
   void
   JobReport::childAfterFork(std::string const& jobReportFile, unsigned int childIndex, unsigned int numberOfChildren) {
-    std::ofstream* p = dynamic_cast<std::ofstream*>(impl_->ost_);
+    std::ofstream* p = dynamic_cast<std::ofstream*>(impl_->ost());
     if(!p) return;
     std::ostringstream ofilename;
     toFileName(jobReportFile, childIndex, numberOfChildren, ofilename);
@@ -405,9 +405,9 @@ namespace edm {
 
     if (inputType == "mixingFiles") {
       theInputType = InputType::SecondarySource;
-      impl_->inputFilesSecSource_.push_back(InputFile());
-      newFile = &impl_->inputFilesSecSource_.back();
-      newToken = impl_->inputFilesSecSource_.size() - 1;
+      auto itr = impl_->inputFilesSecSource_.push_back(InputFile());
+      newFile = &(*itr);
+      newToken = itr - impl_->inputFilesSecSource_.begin();
     } else {
       if (inputType == "secondaryFiles") {
         theInputType = InputType::SecondaryFile;
@@ -504,7 +504,7 @@ namespace edm {
   }
 
   void
-  JobReport::eventWrittenToFile(JobReport::Token fileToken, unsigned int /*run*/, unsigned int) {
+  JobReport::eventWrittenToFile(JobReport::Token fileToken, RunNumber_t /*run*/, EventNumber_t) {
     JobReport::OutputFile& f = impl_->getOutputFileForToken(fileToken);
     ++f.numEventsWritten;
   }
@@ -517,7 +517,7 @@ namespace edm {
   }
 
   void
-  JobReport::reportSkippedEvent(unsigned int run, unsigned int event) {
+  JobReport::reportSkippedEvent(RunNumber_t run, EventNumber_t event) {
     if(impl_->ost_) {
       std::ostream& msg = *(impl_->ost_);
       {

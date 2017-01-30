@@ -30,6 +30,7 @@ the worker is reset().
 #include "FWCore/Framework/interface/ProductHolderIndexAndSkipBit.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ServiceRegistry/interface/ActivityRegistry.h"
+#include "FWCore/ServiceRegistry/interface/ConsumesInfo.h"
 #include "FWCore/ServiceRegistry/interface/InternalContext.h"
 #include "FWCore/ServiceRegistry/interface/ModuleCallingContext.h"
 #include "FWCore/ServiceRegistry/interface/ParentContext.h"
@@ -40,14 +41,14 @@ the worker is reset().
 #include "FWCore/Utilities/interface/BranchType.h"
 #include "FWCore/Utilities/interface/ProductHolderIndex.h"
 #include "FWCore/Utilities/interface/StreamID.h"
+#include "FWCore/Utilities/interface/propagate_const.h"
 
-#include "boost/shared_ptr.hpp"
-
-#include "FWCore/Framework/src/RunStopwatch.h"
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 
+#include <map>
 #include <memory>
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace edm {
@@ -57,7 +58,9 @@ namespace edm {
   class ProductHolderIndexAndSkipBit;
   class StreamID;
   class StreamContext;
-  
+  class ProductRegistry;
+  class ThinnedAssociationsHelper;
+
   namespace workerhelper {
     template< typename O> class CallImpl;
   }
@@ -74,8 +77,7 @@ namespace edm {
     Worker& operator=(Worker const&) = delete; // Disallow copying and moving
 
     template <typename T>
-    bool doWork(typename T::MyPrincipal&, EventSetup const& c,
-                CPUTimer *const timer,
+    bool doWork(typename T::MyPrincipal const&, EventSetup const& c,
                 StreamID stream,
                 ParentContext const& parentContext,
                 typename T::Context const* context);
@@ -88,37 +90,38 @@ namespace edm {
 
     void preForkReleaseResources() {implPreForkReleaseResources();}
     void postForkReacquireResources(unsigned int iChildIndex, unsigned int iNumberOfChildren) {implPostForkReacquireResources(iChildIndex, iNumberOfChildren);}
+    void registerThinnedAssociations(ProductRegistry const& registry, ThinnedAssociationsHelper& helper) { implRegisterThinnedAssociations(registry, helper); }
 
     void reset() { state_ = Ready; }
 
-    void pathFinished(EventPrincipal&);
-    void postDoEvent(EventPrincipal&);
+    void pathFinished(EventPrincipal const&);
+    void postDoEvent(EventPrincipal const&);
 
     ModuleDescription const& description() const {return *(moduleCallingContext_.moduleDescription());}
     ModuleDescription const* descPtr() const {return moduleCallingContext_.moduleDescription(); }
     ///The signals are required to live longer than the last call to 'doWork'
     /// this was done to improve performance based on profiling
-    void setActivityRegistry(boost::shared_ptr<ActivityRegistry> areg);
-    
+    void setActivityRegistry(std::shared_ptr<ActivityRegistry> areg);
+
     void setEarlyDeleteHelper(EarlyDeleteHelper* iHelper);
-    
+
     //Used to make EDGetToken work
     virtual void updateLookup(BranchType iBranchType,
                       ProductHolderIndexHelper const&) = 0;
 
-    virtual void modulesDependentUpon(std::vector<const char*>& oModuleLabels) const = 0;
-    
-    virtual Types moduleType() const =0;
+    virtual void modulesDependentUpon(std::vector<const char*>& oModuleLabels, bool iPrint) const = 0;
 
-    std::pair<double, double> timeCpuReal() const {
-      return std::pair<double, double>(stopwatch_->cpuTime(), stopwatch_->realTime());
-    }
+    virtual void modulesWhoseProductsAreConsumed(std::vector<ModuleDescription const*>& modules,
+                                                 ProductRegistry const& preg,
+                                                 std::map<std::string, ModuleDescription const*> const& labelsToDesc) const = 0;
+
+    virtual std::vector<ConsumesInfo> consumesInfo() const = 0;
+
+    virtual Types moduleType() const =0;
 
     void clearCounters() {
       timesRun_ = timesVisited_ = timesPassed_ = timesFailed_ = timesExcept_ = 0;
     }
-    
-    void useStopwatch();
 
     int timesRun() const { return timesRun_; }
     int timesVisited() const { return timesVisited_; }
@@ -132,30 +135,35 @@ namespace edm {
   protected:
     template<typename O> friend class workerhelper::CallImpl;
     virtual std::string workerType() const = 0;
-    virtual bool implDo(EventPrincipal&, EventSetup const& c,
+    virtual bool implDo(EventPrincipal const&, EventSetup const& c,
                         ModuleCallingContext const* mcc) = 0;
-    virtual bool implDoBegin(RunPrincipal& rp, EventSetup const& c,
+    virtual bool implDoPrePrefetchSelection(StreamID id,
+                                            EventPrincipal const& ep,
+                                            ModuleCallingContext const* mcc) = 0;
+    virtual bool implDoBegin(RunPrincipal const& rp, EventSetup const& c,
                              ModuleCallingContext const* mcc) = 0;
-    virtual bool implDoStreamBegin(StreamID id, RunPrincipal& rp, EventSetup const& c,
+    virtual bool implDoStreamBegin(StreamID id, RunPrincipal const& rp, EventSetup const& c,
                                    ModuleCallingContext const* mcc) = 0;
-    virtual bool implDoStreamEnd(StreamID id, RunPrincipal& rp, EventSetup const& c,
+    virtual bool implDoStreamEnd(StreamID id, RunPrincipal const& rp, EventSetup const& c,
                                  ModuleCallingContext const* mcc) = 0;
-    virtual bool implDoEnd(RunPrincipal& rp, EventSetup const& c,
+    virtual bool implDoEnd(RunPrincipal const& rp, EventSetup const& c,
                            ModuleCallingContext const* mcc) = 0;
-    virtual bool implDoBegin(LuminosityBlockPrincipal& lbp, EventSetup const& c,
+    virtual bool implDoBegin(LuminosityBlockPrincipal const& lbp, EventSetup const& c,
                              ModuleCallingContext const* mcc) = 0;
-    virtual bool implDoStreamBegin(StreamID id, LuminosityBlockPrincipal& lbp, EventSetup const& c,
+    virtual bool implDoStreamBegin(StreamID id, LuminosityBlockPrincipal const& lbp, EventSetup const& c,
                                    ModuleCallingContext const* mcc) = 0;
-    virtual bool implDoStreamEnd(StreamID id, LuminosityBlockPrincipal& lbp, EventSetup const& c,
+    virtual bool implDoStreamEnd(StreamID id, LuminosityBlockPrincipal const& lbp, EventSetup const& c,
                                  ModuleCallingContext const* mcc) = 0;
-    virtual bool implDoEnd(LuminosityBlockPrincipal& lbp, EventSetup const& c,
+    virtual bool implDoEnd(LuminosityBlockPrincipal const& lbp, EventSetup const& c,
                            ModuleCallingContext const* mcc) = 0;
     virtual void implBeginJob() = 0;
     virtual void implEndJob() = 0;
     virtual void implBeginStream(StreamID) = 0;
     virtual void implEndStream(StreamID) = 0;
-    
+
     void resetModuleDescription(ModuleDescription const*);
+
+    ActivityRegistry* activityRegistry() { return actReg_.get(); }
 
   private:
 
@@ -170,7 +178,7 @@ namespace edm {
     virtual void implPreForkReleaseResources() = 0;
     virtual void implPostForkReacquireResources(unsigned int iChildIndex,
                                                unsigned int iNumberOfChildren) = 0;
-    RunStopwatch::StopwatchPointer stopwatch_;
+    virtual void implRegisterThinnedAssociations(ProductRegistry const&, ThinnedAssociationsHelper&) = 0;
 
     int timesRun_;
     int timesVisited_;
@@ -182,11 +190,11 @@ namespace edm {
     ModuleCallingContext moduleCallingContext_;
 
     ExceptionToActionTable const* actions_; // memory assumed to be managed elsewhere
-    boost::shared_ptr<cms::Exception> cached_exception_; // if state is 'exception'
+    edm::propagate_const<std::shared_ptr<cms::Exception>> cached_exception_; // if state is 'exception'
 
-    boost::shared_ptr<ActivityRegistry> actReg_;
-    
-    EarlyDeleteHelper* earlyDeleteHelper_;
+    std::shared_ptr<ActivityRegistry> actReg_; // We do not use propagate_const because the registry itself is mutable.
+
+    edm::propagate_const<EarlyDeleteHelper*> earlyDeleteHelper_;
   };
 
   namespace {
@@ -194,23 +202,21 @@ namespace edm {
     class ModuleSignalSentry {
     public:
       ModuleSignalSentry(ActivityRegistry *a,
-                         ModuleDescription const& md,
                          typename T::Context const* context,
-                         ModuleCallingContext* moduleCallingContext) :
-        a_(a), md_(&md), context_(context), moduleCallingContext_(moduleCallingContext) {
+                         ModuleCallingContext const* moduleCallingContext) :
+        a_(a), context_(context), moduleCallingContext_(moduleCallingContext) {
 
-	if(a_) T::preModuleSignal(a_, md_, context, moduleCallingContext_);
+	if(a_) T::preModuleSignal(a_, context, moduleCallingContext_);
       }
 
       ~ModuleSignalSentry() {
-	if(a_) T::postModuleSignal(a_, md_, context_, moduleCallingContext_);
+	if(a_) T::postModuleSignal(a_, context_, moduleCallingContext_);
       }
 
     private:
-      ActivityRegistry* a_;
-      ModuleDescription const* md_;
+      ActivityRegistry* a_; // We do not use propagate_const because the registry itself is mutable.
       typename T::Context const* context_;
-      ModuleCallingContext* moduleCallingContext_;
+      ModuleCallingContext const* moduleCallingContext_;
     };
 
     template <typename T>
@@ -221,7 +227,7 @@ namespace edm {
       ModuleCallingContext const* imcc = mcc;
       while(imcc->type() == ParentContext::Type::kModule) {
 	std::ostringstream iost;
-        iost << "Calling method for unscheduled module " 
+        iost << "Calling method for unscheduled module "
              << imcc->moduleDescription()->moduleName() << "/'"
              << imcc->moduleDescription()->moduleLabel() << "'";
         ex.addContext(iost.str());
@@ -229,7 +235,7 @@ namespace edm {
       }
       if(imcc->type() == ParentContext::Type::kInternal) {
         std::ostringstream iost;
-        iost << "Calling method for unscheduled module " 
+        iost << "Calling method for unscheduled module "
              << imcc->moduleDescription()->moduleName() << "/'"
              << imcc->moduleDescription()->moduleLabel() << "' (probably inside some kind of mixing module)";
         ex.addContext(iost.str());
@@ -237,7 +243,7 @@ namespace edm {
       }
       while(imcc->type() == ParentContext::Type::kModule) {
         std::ostringstream iost;
-        iost << "Calling method for unscheduled module " 
+        iost << "Calling method for unscheduled module "
              << imcc->moduleDescription()->moduleName() << "/'"
              << imcc->moduleDescription()->moduleLabel() << "'";
         ex.addContext(iost.str());
@@ -274,91 +280,180 @@ namespace edm {
     template<>
     class CallImpl<OccurrenceTraits<EventPrincipal, BranchActionStreamBegin>> {
     public:
-      static bool call(Worker* iWorker, StreamID, EventPrincipal& ep, EventSetup const& es,
-                       ModuleCallingContext const* mcc) {
+      typedef OccurrenceTraits<EventPrincipal, BranchActionStreamBegin> Arg;
+      static bool call(Worker* iWorker, StreamID,
+                       EventPrincipal const& ep, EventSetup const& es,
+                       ActivityRegistry* /* actReg */,
+                       ModuleCallingContext const* mcc,
+                       Arg::Context const* /* context*/) {
+        //Signal sentry is handled by the module
         return iWorker->implDo(ep,es, mcc);
       }
+      static bool prePrefetchSelection(Worker* iWorker,StreamID id,
+                                       typename Arg::MyPrincipal const& ep,
+                                       ModuleCallingContext const* mcc) {
+        return iWorker->implDoPrePrefetchSelection(id,ep,mcc);
+      }
     };
-    
+
     template<>
     class CallImpl<OccurrenceTraits<RunPrincipal, BranchActionGlobalBegin>>{
     public:
-      static bool call(Worker* iWorker,StreamID, RunPrincipal& ep, EventSetup const& es,
-                       ModuleCallingContext const* mcc) {
+      typedef OccurrenceTraits<RunPrincipal, BranchActionGlobalBegin> Arg;
+      static bool call(Worker* iWorker,StreamID,
+                       RunPrincipal const& ep, EventSetup const& es,
+                       ActivityRegistry* actReg,
+                       ModuleCallingContext const* mcc,
+                       Arg::Context const* context) {
+        ModuleSignalSentry<Arg> cpp(actReg, context, mcc);
         return iWorker->implDoBegin(ep,es, mcc);
+      }
+      static bool prePrefetchSelection(Worker* iWorker,StreamID id,
+                                       typename Arg::MyPrincipal const& ep,
+                                       ModuleCallingContext const* mcc) {
+        return true;
       }
     };
     template<>
     class CallImpl<OccurrenceTraits<RunPrincipal, BranchActionStreamBegin>>{
     public:
-      static bool call(Worker* iWorker,StreamID id, RunPrincipal& ep, EventSetup const& es,
-                       ModuleCallingContext const* mcc) {
+      typedef OccurrenceTraits<RunPrincipal, BranchActionStreamBegin> Arg;
+      static bool call(Worker* iWorker,StreamID id,
+                       RunPrincipal const & ep, EventSetup const& es,
+                       ActivityRegistry* actReg,
+                       ModuleCallingContext const* mcc,
+                       Arg::Context const* context) {
+        ModuleSignalSentry<Arg> cpp(actReg, context, mcc);
         return iWorker->implDoStreamBegin(id,ep,es, mcc);
+      }
+      static bool prePrefetchSelection(Worker* iWorker,StreamID id,
+                                       typename Arg::MyPrincipal const& ep,
+                                       ModuleCallingContext const* mcc) {
+        return true;
       }
     };
     template<>
     class CallImpl<OccurrenceTraits<RunPrincipal, BranchActionGlobalEnd>>{
     public:
-      static bool call(Worker* iWorker,StreamID, RunPrincipal& ep, EventSetup const& es,
-                       ModuleCallingContext const* mcc) {
+      typedef OccurrenceTraits<RunPrincipal, BranchActionGlobalEnd> Arg;
+      static bool call(Worker* iWorker,StreamID,
+                       RunPrincipal const& ep, EventSetup const& es,
+                       ActivityRegistry* actReg,
+                       ModuleCallingContext const* mcc,
+                       Arg::Context const* context) {
+        ModuleSignalSentry<Arg> cpp(actReg, context, mcc);
         return iWorker->implDoEnd(ep,es, mcc);
+      }
+      static bool prePrefetchSelection(Worker* iWorker,StreamID id,
+                                       typename Arg::MyPrincipal const& ep,
+                                       ModuleCallingContext const* mcc) {
+        return true;
       }
     };
     template<>
     class CallImpl<OccurrenceTraits<RunPrincipal, BranchActionStreamEnd>>{
     public:
-      static bool call(Worker* iWorker,StreamID id, RunPrincipal& ep, EventSetup const& es,
-                       ModuleCallingContext const* mcc) {
+      typedef OccurrenceTraits<RunPrincipal, BranchActionStreamEnd> Arg;
+      static bool call(Worker* iWorker,StreamID id,
+                       RunPrincipal const& ep, EventSetup const& es,
+                       ActivityRegistry* actReg,
+                       ModuleCallingContext const* mcc,
+                       Arg::Context const* context) {
+        ModuleSignalSentry<Arg> cpp(actReg, context, mcc);
         return iWorker->implDoStreamEnd(id,ep,es, mcc);
       }
+      static bool prePrefetchSelection(Worker* iWorker,StreamID id,
+                                       typename Arg::MyPrincipal const& ep,
+                                       ModuleCallingContext const* mcc) {
+        return true;
+      }
     };
-    
+
     template<>
     class CallImpl<OccurrenceTraits<LuminosityBlockPrincipal, BranchActionGlobalBegin>>{
     public:
-      static bool call(Worker* iWorker,StreamID, LuminosityBlockPrincipal& ep, EventSetup const& es,
-                       ModuleCallingContext const* mcc) {
+      typedef OccurrenceTraits<LuminosityBlockPrincipal, BranchActionGlobalBegin> Arg;
+      static bool call(Worker* iWorker,StreamID,
+                       LuminosityBlockPrincipal const& ep, EventSetup const& es,
+                       ActivityRegistry* actReg,
+                       ModuleCallingContext const* mcc,
+                       Arg::Context const* context) {
+        ModuleSignalSentry<Arg> cpp(actReg, context, mcc);
         return iWorker->implDoBegin(ep,es, mcc);
+      }
+
+      static bool prePrefetchSelection(Worker* iWorker,StreamID id,
+                                       typename Arg::MyPrincipal const& ep,
+                                       ModuleCallingContext const* mcc) {
+        return true;
       }
     };
     template<>
     class CallImpl<OccurrenceTraits<LuminosityBlockPrincipal, BranchActionStreamBegin>>{
     public:
-      static bool call(Worker* iWorker,StreamID id, LuminosityBlockPrincipal& ep, EventSetup const& es,
-                       ModuleCallingContext const* mcc) {
+      typedef OccurrenceTraits<LuminosityBlockPrincipal, BranchActionStreamBegin> Arg;
+      static bool call(Worker* iWorker,StreamID id,
+                       LuminosityBlockPrincipal const& ep, EventSetup const& es,
+                       ActivityRegistry* actReg,
+                       ModuleCallingContext const* mcc,
+                       Arg::Context const* context) {
+        ModuleSignalSentry<Arg> cpp(actReg, context, mcc);
         return iWorker->implDoStreamBegin(id,ep,es, mcc);
       }
-    };
-    
+
+      static bool prePrefetchSelection(Worker* iWorker,StreamID id,
+                                       typename Arg::MyPrincipal const& ep,
+                                       ModuleCallingContext const* mcc) {
+        return true;
+      }
+};
+
     template<>
     class CallImpl<OccurrenceTraits<LuminosityBlockPrincipal, BranchActionGlobalEnd>>{
     public:
-      static bool call(Worker* iWorker,StreamID, LuminosityBlockPrincipal& ep, EventSetup const& es,
-                       ModuleCallingContext const* mcc) {
+      typedef OccurrenceTraits<LuminosityBlockPrincipal, BranchActionGlobalEnd> Arg;
+      static bool call(Worker* iWorker,StreamID,
+                       LuminosityBlockPrincipal const& ep, EventSetup const& es,
+                       ActivityRegistry* actReg,
+                       ModuleCallingContext const* mcc,
+                       Arg::Context const* context) {
+        ModuleSignalSentry<Arg> cpp(actReg, context, mcc);
         return iWorker->implDoEnd(ep,es, mcc);
       }
+      static bool prePrefetchSelection(Worker* iWorker,StreamID id,
+                                       typename Arg::MyPrincipal const& ep,
+                                       ModuleCallingContext const* mcc) {
+        return true;
+      }
+
     };
     template<>
     class CallImpl<OccurrenceTraits<LuminosityBlockPrincipal, BranchActionStreamEnd>>{
     public:
-      static bool call(Worker* iWorker,StreamID id, LuminosityBlockPrincipal& ep, EventSetup const& es,
-                       ModuleCallingContext const* mcc) {
+      typedef OccurrenceTraits<LuminosityBlockPrincipal, BranchActionStreamEnd> Arg;
+      static bool call(Worker* iWorker,StreamID id,
+                       LuminosityBlockPrincipal const& ep, EventSetup const& es,
+                       ActivityRegistry* actReg,
+                       ModuleCallingContext const* mcc,
+                       Arg::Context const* context) {
+        ModuleSignalSentry<Arg> cpp(actReg, context, mcc);
         return iWorker->implDoStreamEnd(id,ep,es, mcc);
+      }
+      
+      static bool prePrefetchSelection(Worker* iWorker,StreamID id,
+                                       typename Arg::MyPrincipal const& ep,
+                                       ModuleCallingContext const* mcc) {
+        return true;
       }
     };
   }
-  
+
   template <typename T>
-  bool Worker::doWork(typename T::MyPrincipal& ep, 
+  bool Worker::doWork(typename T::MyPrincipal const& ep,
                       EventSetup const& es,
-                      CPUTimer* const iTimer,
                       StreamID streamID,
                       ParentContext const& parentContext,
                       typename T::Context const* context) {
-
-    // A RunStopwatch, but only if we are processing an event.
-    RunDualStopwatches stopwatch(T::isEvent_ ? stopwatch_ : RunStopwatch::StopwatchPointer(),
-                                 iTimer);
 
     if (T::isEvent_) {
       ++timesVisited_;
@@ -381,7 +476,14 @@ namespace edm {
 
         if (T::isEvent_) {
           ++timesRun_;
-
+          
+          //if have TriggerResults based selection we want to reject the event before doing prefetching
+          if( not workerhelper::CallImpl<T>::prePrefetchSelection(this,streamID,ep,&moduleCallingContext_) ) {
+            state_ = Pass;
+            ++timesPassed_;
+            rc = true;
+            return;
+          }
           // Prefetch products the module declares it consumes (not including the products it maybe consumes)
           std::vector<ProductHolderIndexAndSkipBit> const& items = itemsToGetFromEvent();
           for(auto const& item : items) {
@@ -394,8 +496,7 @@ namespace edm {
         }
 
         moduleCallingContext_.setState(ModuleCallingContext::State::kRunning);
-        ModuleSignalSentry<T> cpp(actReg_.get(), description(), context, &moduleCallingContext_);
-        rc = workerhelper::CallImpl<T>::call(this,streamID,ep,es, &moduleCallingContext_);
+        rc = workerhelper::CallImpl<T>::call(this,streamID,ep,es, actReg_.get(), &moduleCallingContext_, context);
 
         if (rc) {
           state_ = Pass;
@@ -437,7 +538,7 @@ namespace edm {
         default:
           if (T::isEvent_) ++timesExcept_;
 	  state_ = Exception;
-          cached_exception_.reset(ex.clone());
+          cached_exception_ = std::shared_ptr<cms::Exception>(ex.clone()); // propagate_const<T> has no reset() function
 	  cached_exception_->raise();
       }
     }

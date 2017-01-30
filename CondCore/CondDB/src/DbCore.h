@@ -46,7 +46,7 @@
 // macros for the schema definition
 
 // table definition
-#define table( NAME ) namespace NAME {\
+#define conddb_table( NAME ) namespace NAME {\
     static constexpr char const* tname = #NAME ;\
     }\
     namespace NAME
@@ -71,7 +71,7 @@
 #define SELECT_COLUMN_MACRO(...) GET_4TH_ARG(__VA_ARGS__,  FIXSIZE_COLUMN, VARSIZE_COLUMN, WRONG_PAR_NUMBER_ERROR ) 
 
 // the final column definition macro
-#define column( ... ) SELECT_COLUMN_MACRO(__VA_ARGS__)(__VA_ARGS__)
+#define conddb_column( ... ) SELECT_COLUMN_MACRO(__VA_ARGS__)(__VA_ARGS__)
 
 namespace cond {
 
@@ -442,6 +442,10 @@ namespace cond {
       m_coralQuery->addToOrderList( orderClause );
     }
 
+    void groupBy( const std::string& expression ){
+      m_coralQuery->groupBy( expression );
+    }
+
     void setForUpdate(){
       m_coralQuery->setForUpdate();
     }
@@ -540,6 +544,35 @@ namespace cond {
     std::string m_whereClause;
   };
 
+  class DeleteBuffer {
+
+  public:
+    DeleteBuffer():
+      m_data(),
+      m_whereClause(""){
+    }
+
+    template <typename Column, typename P> void addWhereCondition( const P& param, const std::string condition = "=" ){
+      f_add_condition_data<Column>( m_data, m_whereClause, param, condition );
+    }
+
+    template <typename Column1, typename Column2> void addWhereCondition( const std::string condition = "=" ){
+      f_add_condition<Column1,Column2>( m_whereClause, condition );
+    }
+
+    const coral::AttributeList& get() const {
+      return m_data;
+    }
+
+    const std::string& whereClause() const {
+      return m_whereClause;
+    }
+
+  private:
+    coral::AttributeList m_data;
+    std::string m_whereClause;
+  };
+
   template <typename... Types>  class BulkInserter {
   public:
     static constexpr size_t cacheSize = 1000;
@@ -596,6 +629,9 @@ namespace cond {
       schema.tableHandle( std::string(tableName ) ).dataEditor().updateRows( data.setClause(), data.whereClause(), data.get() );
     }
 
+    inline void deleteFromTable( coral::ISchema& schema, const char* tableName, const DeleteBuffer& data ){
+      schema.tableHandle( std::string(tableName ) ).dataEditor().deleteRows( data.whereClause(), data.get() );
+    }
   }
 
   }

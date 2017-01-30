@@ -8,7 +8,7 @@
 
 //---------------------------------------------------------------------------
 #include "RecoLocalCalo/HcalRecAlgos/interface/HBHEPulseShapeFlag.h"
-#include "RecoLocalCalo/HcalRecAlgos/interface/HcalCaloFlagLabels.h"
+#include "DataFormats/METReco/interface/HcalCaloFlagLabels.h"
 
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
@@ -29,13 +29,28 @@ HBHEPulseShapeFlagSetter::HBHEPulseShapeFlagSetter()
    // we'd trust the flagging algorithm.
    // Set the minimum charge threshold large enough so that nothing will be flagged.
    // 
+   // Along the same lines, set upper thresholds to -99999999.
+   //
 
-   mMinimumChargeThreshold = 99999999;
-   mTS4TS5ChargeThreshold = 99999999;
+   mMinimumChargeThreshold     = 99999999;
+   mTS4TS5ChargeThreshold      = 99999999;
+   mTS3TS4UpperChargeThreshold = -99999999;
+   mTS5TS6UpperChargeThreshold = -99999999;
+   mTS3TS4ChargeThreshold      = 99999999;
+   mTS5TS6ChargeThreshold      = 99999999;
+   mR45PlusOneRange            = 0;
+   mR45MinusOneRange           = 0;
+
 }
 //---------------------------------------------------------------------------
 HBHEPulseShapeFlagSetter::HBHEPulseShapeFlagSetter(double MinimumChargeThreshold,
    double TS4TS5ChargeThreshold,
+   double TS3TS4ChargeThreshold,
+   double TS3TS4UpperChargeThreshold,
+   double TS5TS6ChargeThreshold,						   
+   double TS5TS6UpperChargeThreshold,						   
+   double R45PlusOneRange,						   
+   double R45MinusOneRange,						   
    unsigned int TrianglePeakTS,
    const std::vector<double>& LinearThreshold, 
    const std::vector<double>& LinearCut,
@@ -61,10 +76,16 @@ HBHEPulseShapeFlagSetter::HBHEPulseShapeFlagSetter(double MinimumChargeThreshold
    // Also calls the Initialize() function
    //
 
-   mMinimumChargeThreshold = MinimumChargeThreshold;
-   mTS4TS5ChargeThreshold = TS4TS5ChargeThreshold;
-   mTrianglePeakTS = TrianglePeakTS;
-   mTriangleIgnoreSlow = TriangleIgnoreSlow;
+   mMinimumChargeThreshold     = MinimumChargeThreshold;
+   mTS4TS5ChargeThreshold      = TS4TS5ChargeThreshold;
+   mTS3TS4ChargeThreshold      = TS3TS4ChargeThreshold;
+   mTS3TS4UpperChargeThreshold = TS3TS4UpperChargeThreshold;
+   mTS5TS6ChargeThreshold      = TS5TS6ChargeThreshold;
+   mTS5TS6UpperChargeThreshold = TS5TS6UpperChargeThreshold;
+   mR45PlusOneRange            = R45PlusOneRange;
+   mR45MinusOneRange           = R45MinusOneRange;
+   mTrianglePeakTS             = TrianglePeakTS;
+   mTriangleIgnoreSlow         = TriangleIgnoreSlow;
 
    for(std::vector<double>::size_type i = 0; i < LinearThreshold.size() && i < LinearCut.size(); i++)
       mLambdaLinearCut.push_back(std::pair<double, double>(LinearThreshold[i], LinearCut[i]));
@@ -130,7 +151,7 @@ void HBHEPulseShapeFlagSetter::SetPulseShapeFlags(HBHERecHit &hbhe,
    CaloSamples Tool;
    coder.adc2fC(digi, Tool);
 
-   mCharge.clear();  // mCharge is a vector of (pedestal-subtracted) Charge values vs. time slice
+   //   mCharge.clear();  // mCharge is a vector of (pedestal-subtracted) Charge values vs. time slice
    mCharge.resize(digi.size());
 
    double TotalCharge = 0;
@@ -200,7 +221,33 @@ void HBHEPulseShapeFlagSetter::SetPulseShapeFlags(HBHERecHit &hbhe,
          hbhe.setFlagField(1, HcalCaloFlagLabels::HBHETS4TS5Noise);
       if(CheckPassFilter(mCharge[4] + mCharge[5], TS4TS5, mTS4TS5LowerCut, -1) == false)
          hbhe.setFlagField(1, HcalCaloFlagLabels::HBHETS4TS5Noise);
+      
+      if(CheckPassFilter(mCharge[4] + mCharge[5], TS4TS5, mTS4TS5UpperCut, 1) == false            && // TS4TS5 is above envelope
+         mCharge[3] + mCharge[4] > mTS3TS4ChargeThreshold       &&       mTS3TS4ChargeThreshold>0 && // enough charge in 34
+         mCharge[5] + mCharge[6] < mTS5TS6UpperChargeThreshold  &&  mTS5TS6UpperChargeThreshold>0 && // low charge in 56
+      	 fabs( (mCharge[4] - mCharge[5]) / (mCharge[4] + mCharge[5]) - 1.0 ) < mR45PlusOneRange    ) // R45 is around +1
+   	{
+           double TS3TS4 = (mCharge[3] - mCharge[4]) / (mCharge[3] + mCharge[4]);
+           if(CheckPassFilter(mCharge[3] + mCharge[4], TS3TS4, mTS4TS5UpperCut,  1) == true && // use the same envelope as TS4TS5
+	      CheckPassFilter(mCharge[3] + mCharge[4], TS3TS4, mTS4TS5LowerCut, -1) == true && // use the same envelope as TS4TS5
+	      TS3TS4>(mR45MinusOneRange-1)                                                   ) // horizontal cut on R34 (R34>-0.8)
+	       hbhe.setFlagField(1, HcalCaloFlagLabels::HBHEOOTPU); // set to 1 if there is a pulse-shape-wise good OOTPU in TS3TS4.
+   	}
+
+      if(CheckPassFilter(mCharge[4] + mCharge[5], TS4TS5, mTS4TS5LowerCut, -1) == false            && // TS4TS5 is below envelope
+         mCharge[3] + mCharge[4] < mTS3TS4UpperChargeThreshold  &&  mTS3TS4UpperChargeThreshold>0  && // low charge in 34
+         mCharge[5] + mCharge[6] > mTS5TS6ChargeThreshold       &&       mTS5TS6ChargeThreshold>0  && // enough charge in 56
+         fabs( (mCharge[4] - mCharge[5]) / (mCharge[4] + mCharge[5]) + 1.0 ) < mR45MinusOneRange    ) // R45 is around -1
+        {
+           double TS5TS6 = (mCharge[5] - mCharge[6]) / (mCharge[5] + mCharge[6]);
+           if(CheckPassFilter(mCharge[5] + mCharge[6], TS5TS6, mTS4TS5UpperCut,  1) == true && // use the same envelope as TS4TS5
+	      CheckPassFilter(mCharge[5] + mCharge[6], TS5TS6, mTS4TS5LowerCut, -1) == true && // use the same envelope as TS4TS5
+	      TS5TS6<(1-mR45PlusOneRange)                                                    ) // horizontal cut on R56 (R56<+0.8)
+	       hbhe.setFlagField(1, HcalCaloFlagLabels::HBHEOOTPU); // set to 1 if there is a pulse-shape-wise good OOTPU in TS5TS6.
+        }
+        
    }
+
 }
 //---------------------------------------------------------------------------
 void HBHEPulseShapeFlagSetter::Initialize()
@@ -447,6 +494,8 @@ double HBHEPulseShapeFlagSetter::PerformDualNominalFit(const std::vector<double>
    int AvailableDistance[] = {-100, -75, -50, 50, 75, 100};
 
    // loop over possible pulse distances between two components
+   bool isFirst=true;
+
    for(int k = 0; k < 6; k++)
    {
       double SingleMinimumChi2 = 1000000;
@@ -455,8 +504,8 @@ double HBHEPulseShapeFlagSetter::PerformDualNominalFit(const std::vector<double>
       // scan coarsely through different offsets and find the minimum
       for(int i = 0; i + 250 < (int)CumulativeIdealPulse.size(); i += 10)
       {
-         double Chi2 = DualNominalFitSingleTry(Charge, i, AvailableDistance[k]);
-
+	double Chi2 = DualNominalFitSingleTry(Charge, i, AvailableDistance[k],isFirst);
+	isFirst=false;
          if(Chi2 < SingleMinimumChi2)
          {
             SingleMinimumChi2 = Chi2;
@@ -467,7 +516,7 @@ double HBHEPulseShapeFlagSetter::PerformDualNominalFit(const std::vector<double>
       // around the minimum, scan finer for better a better minimum
       for(int i = MinOffset - 15; i + 250 < (int)CumulativeIdealPulse.size() && i < MinOffset + 15; i++)
       {
-         double Chi2 = DualNominalFitSingleTry(Charge, i, AvailableDistance[k]);
+	double Chi2 = DualNominalFitSingleTry(Charge, i, AvailableDistance[k],false);
          if(Chi2 < SingleMinimumChi2)
             SingleMinimumChi2 = Chi2;
       }
@@ -480,7 +529,7 @@ double HBHEPulseShapeFlagSetter::PerformDualNominalFit(const std::vector<double>
    return OverallMinimumChi2;
 }
 //---------------------------------------------------------------------------
-double HBHEPulseShapeFlagSetter::DualNominalFitSingleTry(const std::vector<double> &Charge, int Offset, int Distance)
+double HBHEPulseShapeFlagSetter::DualNominalFitSingleTry(const std::vector<double> &Charge, int Offset, int Distance, bool newCharges)
 {
    //
    // Does a fit to dual signal pulse hypothesis given offset and distance of the two target pulses
@@ -499,8 +548,18 @@ double HBHEPulseShapeFlagSetter::DualNominalFitSingleTry(const std::vector<doubl
    if(CumulativeIdealPulse[Offset+250] - CumulativeIdealPulse[Offset] < 1e-5)
       return 1000000;
 
-   std::vector<double> F1(DigiSize);
-   std::vector<double> F2(DigiSize);
+   if ( newCharges) {
+     f1_.resize(DigiSize);
+     f2_.resize(DigiSize);
+     errors_.resize(DigiSize);
+     for(int j = 0; j < DigiSize; j++)
+       {
+	 errors_[j] = Charge[j];
+	 if(errors_[j] < 1)
+	   errors_[j] = 1;
+	 errors_[j]=1.0/errors_[j];
+       }
+   }
 
    double SumF1F1 = 0;
    double SumF1F2 = 0;
@@ -508,12 +567,11 @@ double HBHEPulseShapeFlagSetter::DualNominalFitSingleTry(const std::vector<doubl
    double SumTF1 = 0;
    double SumTF2 = 0;
 
-   double Error = 0;
-
+   unsigned int cipSize=CumulativeIdealPulse.size();
    for(int j = 0; j < DigiSize; j++)
    {
       // this is the TS value for in-time component - no problem we can do a subtraction directly
-      F1[j] = CumulativeIdealPulse[Offset+j*25+25] - CumulativeIdealPulse[Offset+j*25];
+      f1_[j] = CumulativeIdealPulse[Offset+j*25+25] - CumulativeIdealPulse[Offset+j*25];
 
       // However for the out-of-time component the index might go out-of-bound.
       // Let's protect against this.
@@ -522,26 +580,25 @@ double HBHEPulseShapeFlagSetter::DualNominalFitSingleTry(const std::vector<doubl
       
       double C1 = 0;   // lower-indexed value in the cumulative pulse shape
       double C2 = 0;   // higher-indexed value in the cumulative pulse shape
+
       
-      if(OffsetTemp + 25 < (int)CumulativeIdealPulse.size() && OffsetTemp + 25 >= 0)
-         C1 = CumulativeIdealPulse[OffsetTemp+25];
-      if(OffsetTemp + 25 >= (int)CumulativeIdealPulse.size())
-         C1 = CumulativeIdealPulse[CumulativeIdealPulse.size()-1];
-      if(OffsetTemp < (int)CumulativeIdealPulse.size() && OffsetTemp >= 0)
-         C2 = CumulativeIdealPulse[OffsetTemp];
-      if(OffsetTemp >= (int)CumulativeIdealPulse.size())
-         C2 = CumulativeIdealPulse[CumulativeIdealPulse.size()-1];
-      F2[j] = C1 - C2;
+      if(OffsetTemp + 25 >= (int)cipSize)
+	C1 = CumulativeIdealPulse[cipSize-1];
+      else
+	if( OffsetTemp  >= -25)
+	  C1 = CumulativeIdealPulse[OffsetTemp+25];
+      if(OffsetTemp >= (int)cipSize)
+	C2 = CumulativeIdealPulse[cipSize-1];
+      else
+	if( OffsetTemp >= 0)
+	  C2 = CumulativeIdealPulse[OffsetTemp];
+      f2_[j] = C1 - C2;
 
-      Error = Charge[j];
-      if(Error < 1)
-         Error = 1;
-
-      SumF1F1 += F1[j] * F1[j] / Error;
-      SumF1F2 += F1[j] * F2[j] / Error; 
-      SumF2F2 += F2[j] * F2[j] / Error;
-      SumTF1  += F1[j] * Charge[j] / Error; 
-      SumTF2  += F2[j] * Charge[j] / Error; 
+      SumF1F1 += f1_[j] * f1_[j] * errors_[j];
+      SumF1F2 += f1_[j] * f2_[j] * errors_[j]; 
+      SumF2F2 += f2_[j] * f2_[j] * errors_[j];
+      SumTF1  += f1_[j] * Charge[j] * errors_[j]; 
+      SumTF2  += f2_[j] * Charge[j] * errors_[j]; 
    }
 
    double Height  = 0;
@@ -555,12 +612,8 @@ double HBHEPulseShapeFlagSetter::DualNominalFitSingleTry(const std::vector<doubl
    double Chi2 = 0;
    for(int j = 0; j < DigiSize; j++)
    {
-      double Error = Charge[j];
-      if(Error < 1)
-         Error = 1;
-
-      double Residual = Height * F1[j] + Height2 * F2[j] - Charge[j];  
-      Chi2 += Residual * Residual / Error;                             
+      double Residual = Height * f1_[j] + Height2 * f2_[j] - Charge[j];  
+      Chi2 += Residual * Residual *errors_[j];           
    } 
 
    // Safety protection in case of zero

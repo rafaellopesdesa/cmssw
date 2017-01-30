@@ -24,6 +24,7 @@
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/TrackReco/interface/TrackExtra.h"
+#include "Geometry/Records/interface/TrackerTopologyRcd.h"
 
 #include "RecoPixelVertexing/PixelTriplets/interface/QuadrupletSeedMerger.h"
 
@@ -56,6 +57,7 @@ PixelTrackReconstruction::PixelTrackReconstruction(const ParameterSet& cfg,
     if(theConfig.exists("useFilterWithES")) {
       edm::LogInfo("Obsolete") << "useFilterWithES parameter is obsolete and can be removed";
     }
+    useClusterShape = filterPSet.exists("useClusterShape");
   }
 
   ParameterSet orderedPSet =
@@ -97,17 +99,18 @@ void PixelTrackReconstruction::init(const edm::EventSetup& es)
 
 void PixelTrackReconstruction::run(TracksWithTTRHs& tracks, edm::Event& ev, const edm::EventSetup& es)
 {
-  typedef std::vector<TrackingRegion* > Regions;
+  typedef std::vector<std::unique_ptr<TrackingRegion> > Regions;
   typedef Regions::const_iterator IR;
   Regions regions = theRegionProducer->regions(ev,es);
 
   //Retrieve tracker topology from geometry
   edm::ESHandle<TrackerTopology> tTopoHand;
-  es.get<IdealGeometryRecord>().get(tTopoHand);
+  es.get<TrackerTopologyRcd>().get(tTopoHand);
   const TrackerTopology *tTopo=tTopoHand.product();
 
   if (theFilter) theFilter->update(ev, es);
-
+  
+  std::vector<const TrackingRecHit *> hits;hits.reserve(4); 
   for (IR ir=regions.begin(), irEnd=regions.end(); ir < irEnd; ++ir) {
     const TrackingRegion & region = **ir;
 
@@ -120,30 +123,34 @@ void PixelTrackReconstruction::run(TracksWithTTRHs& tracks, edm::Event& ev, cons
     for (unsigned int iTuplet = 0; iTuplet < nTuplets; ++iTuplet) {
       const SeedingHitSet & tuplet = tuplets[iTuplet];
 
-      std::vector<const TrackingRecHit *> hits;
-      for (unsigned int iHit = 0, nHits = tuplet.size(); iHit < nHits; ++iHit) {
-        hits.push_back( tuplet[iHit]->hit() );
-      }
-
+      /// FIXME at some point we need to migrate the fitter...
+      auto nHits = tuplet.size(); hits.resize(nHits);
+      for (unsigned int iHit = 0; iHit < nHits; ++iHit) hits[iHit] = tuplet[iHit];
+   
       // fitting
       reco::Track* track = theFitter->run( ev, es, hits, region);
       if (!track) continue;
 
-      // decide if track should be skipped according to filter
-      if (theFilter && !(*theFilter)(track, hits) ) {
-        delete track;
-        continue;
+      if (theFilter) {
+	if ((useClusterShape && !(*theFilter)(track, hits, tTopo)) ||
+	    (!useClusterShape && !(*theFilter)(track, hits))) {
+	  delete track;
+	  continue;
+	}
       }
 
       // add tracks
-      tracks.push_back(TrackWithTTRHs(track, tuplet));
+      tracks.emplace_back(track, tuplet);
     }
     theGenerator->clear();
   }
 
   // skip ovelrapped tracks
-  if (theCleaner) tracks = PixelTrackCleanerWrapper(theCleaner).clean(tracks,tTopo);
-
-  // clean memory
-  for (IR ir=regions.begin(), irEnd=regions.end(); ir < irEnd; ++ir) delete (*ir);
+  
+  if (theCleaner) {
+    if (theCleaner->fast)
+       theCleaner->cleanTracks(tracks,tTopo);
+    else
+      tracks = PixelTrackCleanerWrapper(theCleaner).clean(tracks,tTopo);
+  }
 }

@@ -14,6 +14,8 @@
 <use   name="HLTrigger/HLTcore"/>
 <use   name="RecoJets/JetAlgorithms"/>
 <use   name="RecoJets/JetProducers"/>
+<use   name="RecoHI/HiJetAlgos"/>
+<use   name="RecoHI/HiCentralityAlgos"/> 
 <use   name="DataFormats/CSCRecHit"/>
 <use   name="DataFormats/EcalDetId"/>
 <use   name="DataFormats/DetId"/>
@@ -41,5 +43,4 @@
 <use   name="RecoMuon/TrackingTools"/>
 <use   name="CommonTools/RecoAlgos"/> 
 <use   name="JetMETCorrections/Objects"/>
-#<flags   CXXFLAGS="-O0 -g3 -fno-inline"/>
 <flags   EDM_PLUGIN="1"/>

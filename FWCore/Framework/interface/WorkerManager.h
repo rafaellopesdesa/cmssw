@@ -12,8 +12,9 @@
 #include "FWCore/Framework/src/WorkerRegistry.h"
 #include "FWCore/Utilities/interface/ConvertException.h"
 #include "FWCore/Utilities/interface/Exception.h"
+#include "FWCore/Utilities/interface/get_underlying_safe.h"
 
-#include "boost/shared_ptr.hpp"
+#include <memory>
 
 #include <set>
 #include <string>
@@ -30,17 +31,16 @@ namespace edm {
   public:
     typedef std::vector<Worker*> AllWorkers;
 
-    WorkerManager(boost::shared_ptr<ActivityRegistry> actReg, ExceptionToActionTable const& actions);
+    WorkerManager(std::shared_ptr<ActivityRegistry> actReg, ExceptionToActionTable const& actions);
 
-    WorkerManager(boost::shared_ptr<ModuleRegistry> modReg,
-                  boost::shared_ptr<ActivityRegistry> actReg,
+    WorkerManager(std::shared_ptr<ModuleRegistry> modReg,
+                  std::shared_ptr<ActivityRegistry> actReg,
                   ExceptionToActionTable const& actions);
     void addToUnscheduledWorkers(ParameterSet& pset,
                                  ProductRegistry& preg,
                                  PreallocationConfiguration const* prealloc,
-                                 boost::shared_ptr<ProcessConfiguration> processConfiguration,
+                                 std::shared_ptr<ProcessConfiguration> processConfiguration,
                                  std::string label,
-                                 bool useStopwatch,
                                  std::set<std::string>& unscheduledLabels,
                                  std::vector<std::string>& shouldBeUsedLabels);
 
@@ -63,14 +63,14 @@ namespace edm {
     
     AllWorkers const& allWorkers() const {return allWorkers_;}
 
-    void addToAllWorkers(Worker* w, bool useStopwatch);
+    void addToAllWorkers(Worker* w);
 
     ExceptionToActionTable const&  actionTable() const {return *actionTable_;}
 
     Worker* getWorker(ParameterSet& pset,
                       ProductRegistry& preg,
                       PreallocationConfiguration const* prealloc,
-                      boost::shared_ptr<ProcessConfiguration const> processConfiguration,
+                      std::shared_ptr<ProcessConfiguration const> processConfiguration,
                       std::string const& label);
 
   private:
@@ -79,12 +79,15 @@ namespace edm {
 
     void setupOnDemandSystem(EventPrincipal& principal, EventSetup const& es);
 
+    std::shared_ptr<UnscheduledCallProducer const> unscheduled() const {return get_underlying_safe(unscheduled_);}
+    std::shared_ptr<UnscheduledCallProducer>& unscheduled() {return get_underlying_safe(unscheduled_);}
+
     WorkerRegistry      workerReg_;
     ExceptionToActionTable const*  actionTable_;
 
     AllWorkers          allWorkers_;
 
-    boost::shared_ptr<UnscheduledCallProducer> unscheduled_;
+    edm::propagate_const<std::shared_ptr<UnscheduledCallProducer>> unscheduled_;
   };
 
   template <typename T, typename U>

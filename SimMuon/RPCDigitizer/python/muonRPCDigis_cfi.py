@@ -19,13 +19,17 @@ simMuonRPCDigis = cms.EDProducer("RPCDigiProducer",
         Nbxing = cms.int32(9),
         timeJitter = cms.double(1.0)
     ),
+    doBkgNoise = cms.bool(True), #False - no noise and bkg simulation
     Signal = cms.bool(True),
     mixLabel = cms.string('mix'),                                 
     InputCollection = cms.string('g4SimHitsMuonRPCHits'),
-    digiModel = cms.string('RPCSimAverageNoiseEffCls')
-#    digiModel = cms.string('RPCSimAsymmetricCls')
+#    digiModel = cms.string('RPCSimAverageNoiseEffCls')
+    digiModel = cms.string('RPCSimAsymmetricCls')
 #the new digitizer is RPCSimAsymmetricCls
 )
 
 
-
+from Configuration.StandardSequences.Eras import eras
+if eras.fastSim.isChosen():
+    simMuonRPCDigis.InputCollection = 'MuonSimHitsMuonRPCHits'
+    

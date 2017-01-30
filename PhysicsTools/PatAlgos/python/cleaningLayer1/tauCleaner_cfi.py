@@ -1,14 +1,22 @@
 import FWCore.ParameterSet.Config as cms
 
+## string added as general entry for module definition here and use in tauTools.py
+preselection = cms.string(
+    'tauID("decayModeFinding") > 0.5 &'
+    ' tauID("byLooseCombinedIsolationDeltaBetaCorr3Hits") > 0.5 &'
+    ' tauID("againstMuonTight3") > 0.5 &'
+    ' tauID("againstElectronVLooseMVA6") > 0.5'
+)
+
 cleanPatTaus = cms.EDProducer("PATTauCleaner",
     src = cms.InputTag("selectedPatTaus"),
 
     # preselection (any string-based cut on pat::Tau)
     preselection = cms.string(
         'tauID("decayModeFinding") > 0.5 &'
-        ' tauID("byLooseCombinedIsolationDeltaBetaCorr") > 0.5 &'
-        ' tauID("againstMuonTight") > 0.5 &'
-        ' tauID("againstElectronMedium") > 0.5'
+        ' tauID("byLooseCombinedIsolationDeltaBetaCorr3Hits") > 0.5 &'
+        ' tauID("againstMuonTight3") > 0.5 &'
+        ' tauID("againstElectronVLooseMVA6") > 0.5'
     ),
 
     # overlap checking configurables
@@ -34,5 +42,5 @@ cleanPatTaus = cms.EDProducer("PATTauCleaner",
     ),
 
     # finalCut (any string-based cut on pat::Tau)
-    finalCut = cms.string('pt > 20. & abs(eta) < 2.3'),
+    finalCut = cms.string('pt > 18. & abs(eta) < 2.3'),
 )

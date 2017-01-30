@@ -16,7 +16,16 @@ ecalDigitizer = cms.PSet(
     ecal_sim_parameter_map,
     ecal_notCont_sim,
     es_electronics_sim,
+    hitsProducer = cms.string('g4SimHits'),
     accumulatorType = cms.string("EcalDigiProducer"),
     makeDigiSimLinks = cms.untracked.bool(False)
 )
+
+from Configuration.StandardSequences.Eras import eras
+if eras.fastSim.isChosen():
+    ecalDigitizer.hitsProducer = cms.string("famosSimHits")
+    
+ecalDigitizer.doEB = cms.bool(True)
+ecalDigitizer.doEE = cms.bool(True)
+ecalDigitizer.doES = cms.bool(True)
 

@@ -30,11 +30,13 @@
 #include "DataFormats/L1DTTrackFinder/interface/L1MuDTChambThDigi.h"
 #include "DataFormats/L1DTTrackFinder/interface/L1MuDTTrackContainer.h"
 
+#include "DQMServices/Core/interface/DQMEDAnalyzer.h"
+
 //
 // class decleration
 //
 
-class L1TDTTPG : public edm::EDAnalyzer {
+class L1TDTTPG : public DQMEDAnalyzer {
 
  public:
 
@@ -47,15 +49,11 @@ class L1TDTTPG : public edm::EDAnalyzer {
  protected:
   // Analyze
   void analyze(const edm::Event& e, const edm::EventSetup& c);
-
-  // BeginJob
-  void beginJob(void);
-
-  // EndJob
-  void endJob(void);
-
+  
   // BeginRun
-  void beginRun(edm::Run const& iRun, edm::EventSetup const& iSetup);
+  virtual void bookHistograms(DQMStore::IBooker &ibooker, edm::Run const&, edm::EventSetup const&) override;
+  virtual void dqmBeginRun(edm::Run const&, edm::EventSetup const&);
+  virtual void beginLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&);
 
 
  private:
@@ -64,7 +62,6 @@ class L1TDTTPG : public edm::EDAnalyzer {
   void setMapThLabel(MonitorElement *me);
 
   // ----------member data ---------------------------
-  DQMStore * dbe;
 
   MonitorElement* dttpgphbx[8];  
   MonitorElement* dttpgphbxcomp;

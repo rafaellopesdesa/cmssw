@@ -1,4 +1,5 @@
 #include "DataFormats/TrackingRecHit/interface/TrackingRecHit.h"
+#include "DataFormats/TrackingRecHit/interface/KfComponentsHolder.h"
 #include "Geometry/CommonDetUnit/interface/GeomDetUnit.h"
 
 #include "FWCore/Utilities/interface/Exception.h"
@@ -39,7 +40,7 @@ namespace {
 
 const GeomDetUnit * TrackingRecHit::detUnit() const
 {
-  return dynamic_cast<const GeomDetUnit*>(det());
+  return det();
 }
 
 

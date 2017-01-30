@@ -33,8 +33,12 @@ namespace cond {
       explicit IOVEditor( const std::shared_ptr<SessionImpl>& session );
 
       // ctor used after new tag creation. the specified params are assumed and passed directly to the object.
-      IOVEditor( const std::shared_ptr<SessionImpl>& session, const std::string& tag, cond::TimeType timeType, 
-		 const std::string& payloadType, cond::SynchronizationType synchronizationType );
+      IOVEditor( const std::shared_ptr<SessionImpl>& session, 
+		 const std::string& tag, 
+		 cond::TimeType timeType, 
+		 const std::string& payloadType, 
+		 cond::SynchronizationType synchronizationType, 
+		 const boost::posix_time::ptime& creationTime = boost::posix_time::microsec_clock::universal_time() );
 
       //
       IOVEditor( const IOVEditor& rhs );
@@ -72,6 +76,8 @@ namespace cond {
       // execute the update/intert queries and reset the buffer
       bool flush();
       bool flush( const boost::posix_time::ptime& operationTime );
+      bool flush( const std::string& logText );
+      bool flush( const std::string& logText, const boost::posix_time::ptime& operationTime );
       
     private:
       void checkTransaction( const std::string& ctx );

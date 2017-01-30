@@ -101,7 +101,10 @@ FWTableViewManager::FWTableViewManager(FWGUIManager* iGUIMgr)
    table("reco::Jet").
    column("pT", 1, "pt").
    column("eta", 3).
-   column("phi", 3);
+   column("phi", 3).
+   column("electronEnergyFraction", 3, "electronEnergyFraction()").
+   column("muonEnergyFraction", 3, "muonEnergyFraction()").
+   column("photonEnergyFraction", 3, "photonEnergyFraction()");
 
    table("reco::MET").
    column("et", 1).
@@ -175,6 +178,37 @@ FWTableViewManager::FWTableViewManager(FWGUIManager* iGUIMgr)
    column("energy",3).
    column("time",3).
    column("flags",TableEntry::INT,"flags");
+
+   table("reco::PFCandidate").
+   column("et", 1, "Et").
+   column("eta", 3).
+   column("phi", 3).
+   column("ecalEnergy", 3,"ecalEnergy()").
+   column("hcalEnergy", 3,"hcalEnergy()").
+   column("track pt", 3,"trackRef().pt()");
+
+   table("reco::Electron").
+   column("pT", 1, "pt").
+   column("eta", 3).
+   column("phi", 3).
+   column("E/p", 3, "eSuperClusterOverP").
+   column("H/E", 3, "hadronicOverEm").
+   column("fbrem", 3,"(trackMomentumAtVtx().R() - trackMomentumOut().R()) / trackMomentumAtVtx().R()" ).
+   column("dei",3, "deltaEtaSuperClusterTrackAtVtx" ).
+   column("dpi", 3, "deltaPhiSuperClusterTrackAtVtx()").
+   column("charge", 0, "charge").
+   column("isPF", 0, "isPF()").
+   column("sieie", 3, "sigmaIetaIeta").
+   column("isNotConv", 1, "passConversionVeto");
+
+   table("pat::PackedCandidate").
+   column("pT", 1, "pt").
+   column("eta", 3).
+   column("phi", 3).
+   column("pdgId", 0).
+   column("charge", 0).
+   column("dxy", 3).
+   column("dzAssociatedPV", 3, "dzAssociatedPV()");
 }
 
 FWTableViewManager::~FWTableViewManager()
@@ -290,13 +324,13 @@ FWTableViewManager::tableFormats(const edm::TypeWithDict &key)
          continue;
       if (!m.isConst())
          continue;
-      if (m.returnType().name() == isint)
+      if (m.finalReturnType().name() == isint)
          handle.column(m.name().c_str(), TableEntry::INT);
-      else if (m.returnType().name() == isbool)
+      else if (m.finalReturnType().name() == isbool)
          handle.column(m.name().c_str(), TableEntry::BOOL);
-      else if (m.returnType().name() == isdouble)
+      else if (m.finalReturnType().name() == isdouble)
          handle.column(m.name().c_str(), 5);
-      else if (m.returnType().name() == isfloat)
+      else if (m.finalReturnType().name() == isfloat)
          handle.column(m.name().c_str(), 3);
    }
    edm::TypeDataMembers dataMembers(key);

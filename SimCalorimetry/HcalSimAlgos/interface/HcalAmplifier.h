@@ -22,8 +22,9 @@ namespace CLHEP {
 
 class HcalAmplifier {
 public:
-  HcalAmplifier(const CaloVSimParameterMap * parameters, bool addNoise);
-  virtual ~HcalAmplifier(){ }
+  HcalAmplifier(const CaloVSimParameterMap * parameters, bool addNoise, bool PreMix1, bool PreMix2);
+
+  virtual ~HcalAmplifier() {}
 
   /// the Producer will probably update this every event
   void setDbService(const HcalDbService * service);
@@ -34,7 +35,7 @@ public:
   void setNoiseSignalGenerator(const CaloVNoiseSignalGenerator * noiseSignalGenerator) {
     theNoiseSignalGenerator = noiseSignalGenerator;
   }
-  void setTimeSlewSim(const HcalTimeSlewSim * timeSlewSim) {
+  void setTimeSlewSim(HcalTimeSlewSim * timeSlewSim) {
     theTimeSlewSim = timeSlewSim;
   }
 
@@ -62,10 +63,14 @@ private:
   const HcalDbService * theDbService;
   const CaloVSimParameterMap * theParameterMap;
   const CaloVNoiseSignalGenerator * theNoiseSignalGenerator;
+  const HcalCholeskyMatrices * myCholeskys;
+  const HcalPedestals * myADCPeds;
   HPDIonFeedbackSim * theIonFeedbackSim;
-  const  HcalTimeSlewSim * theTimeSlewSim;
+  HcalTimeSlewSim * theTimeSlewSim;
   unsigned theStartingCapId;
   bool addNoise_;
+  bool preMixDigi_;
+  bool preMixAdd_;
   bool useOldHB;
   bool useOldHE;
   bool useOldHF;
@@ -75,8 +80,6 @@ private:
   double HE_ff;
   double HF_ff;
   double HO_ff;
-  const HcalCholeskyMatrices * myCholeskys;
-  const HcalPedestals * myADCPeds;
 };
 
 #endif

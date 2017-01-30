@@ -10,13 +10,9 @@
 
 #include <vector>
 
-//namespace edm {class ParameterSet;}
-class TransientTrackingRecHitBuilder;
-class TrackerGeometry;
-class MagneticField;
 
 
-class PixelFitterByHelixProjections : public PixelFitter {
+class PixelFitterByHelixProjections final : public PixelFitter {
 public:
   PixelFitterByHelixProjections(  const edm::ParameterSet& cfg);
   virtual ~PixelFitterByHelixProjections() {}
@@ -38,10 +34,7 @@ private:
   */
 private:
   edm::ParameterSet theConfig;
-
-  mutable const TrackerGeometry * theTracker;
   mutable const MagneticField * theField;
-  mutable const TransientTrackingRecHitBuilder * theTTRecHitBuilder;
-
+ 
 };
 #endif

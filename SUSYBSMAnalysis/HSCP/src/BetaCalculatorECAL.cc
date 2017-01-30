@@ -21,7 +21,7 @@ BetaCalculatorECAL::BetaCalculatorECAL(const edm::ParameterSet& iConfig, edm::Co
   EERecHitCollectionToken_(iC.consumes<EERecHitCollection>(iConfig.getParameter<edm::InputTag>("EERecHitCollection")))
 {
    edm::ParameterSet trkParameters = iConfig.getParameter<edm::ParameterSet>("TrackAssociatorParameters");
-   parameters_.loadParameters( trkParameters );
+   parameters_.loadParameters( trkParameters, iC );
    trackAssociator_.useDefaultPropagator();
 
 }
@@ -131,8 +131,8 @@ void BetaCalculatorECAL::addInfoToCandidate(HSCParticle& candidate, edm::Handle<
        result.ecalEnergies.push_back(hit.energy());
        result.ecalTimes.push_back(hit.time());
        result.ecalTimeErrors.push_back(hit.timeError());
-       result.ecalOutOfTimeEnergies.push_back(hit.outOfTimeEnergy());
-       result.ecalOutOfTimeChi2s.push_back(hit.outOfTimeChi2());
+       result.ecalOutOfTimeEnergies.push_back(0.);
+       result.ecalOutOfTimeChi2s.push_back(0.);
        result.ecalChi2s.push_back(hit.chi2());
        result.ecalDetIds.push_back(ebDetId);
        // SIC DEBUG

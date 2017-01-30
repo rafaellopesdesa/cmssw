@@ -9,10 +9,12 @@
 #include "SimG4Core/Application/interface/SimTrackManager.h"
 #include "SimG4Core/Application/interface/G4SimEvent.h"
 #include "SimG4Core/Application/interface/ParametrisedEMPhysics.h"
-
+#include "SimG4Core/Application/interface/G4RegionReporter.h"
+#include "SimG4Core/Application/interface/CMSGDMLWriteStructure.h"
 #include "SimG4Core/Geometry/interface/DDDWorld.h"
 #include "SimG4Core/Geometry/interface/G4LogicalVolumeToDDLogicalPartMap.h"
 #include "SimG4Core/Geometry/interface/SensitiveDetectorCatalog.h"
+#include "SimG4Core/Physics/interface/DDG4ProductionCuts.h"
 
 #include "SimG4Core/SensitiveDetector/interface/AttachSD.h"
 
@@ -20,6 +22,7 @@
 #include "SimG4Core/Physics/interface/PhysicsListFactory.h"
 #include "SimG4Core/Watcher/interface/SimWatcherFactory.h"
 #include "SimG4Core/MagneticField/interface/FieldBuilder.h"
+#include "SimG4Core/MagneticField/interface/ChordFinderSetter.h"
 #include "SimG4Core/MagneticField/interface/Field.h"
 
 #include "MagneticField/Engine/interface/MagneticField.h"
@@ -29,22 +32,22 @@
 #include "SimG4Core/Notification/interface/BeginOfJob.h"
 #include "SimG4Core/Notification/interface/CurrentG4Track.h"
 
+#include "SimG4Core/Geometry/interface/G4CheckOverlap.h"
+
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 #include "FWCore/Framework/interface/ESTransientHandle.h"
-#include "Geometry/Records/interface/IdealGeometryRecord.h"
-
-#include "DetectorDescription/Core/interface/DDCompactView.h"
-
 #include "FWCore/ServiceRegistry/interface/Service.h"
+
+#include "Geometry/Records/interface/IdealGeometryRecord.h"
+#include "DetectorDescription/Core/interface/DDCompactView.h"
 
 #include "SimDataFormats/Forward/interface/LHCTransportLinkContainer.h"
 
-#include "HepPDT/defs.h"
-#include "HepPDT/TableBuilder.hh"
 #include "HepPDT/ParticleDataTable.hh"
 #include "SimGeneral/HepPDTRecord/interface/PDTRecord.h"
 
+#include "G4GeometryManager.hh"
 #include "G4StateManager.hh"
 #include "G4ApplicationState.hh"
 #include "G4RunManagerKernel.hh"
@@ -55,6 +58,8 @@
 #include "G4Event.hh"
 #include "G4TransportationManager.hh"
 #include "G4ParticleTable.hh"
+#include "G4Field.hh"
+#include "G4FieldManager.hh"
 
 #include "G4GDMLParser.hh"
 #include "G4SystemOfUnits.hh"
@@ -66,13 +71,11 @@
 
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
-#include "SimG4Core/Application/interface/ExceptionHandler.h"
-
 static
 void createWatchers(const edm::ParameterSet& iP,
 		    SimActivityRegistry& iReg,
-		    std::vector<boost::shared_ptr<SimWatcher> >& oWatchers,
-		    std::vector<boost::shared_ptr<SimProducer> >& oProds
+		    std::vector<std::shared_ptr<SimWatcher> >& oWatchers,
+		    std::vector<std::shared_ptr<SimProducer> >& oProds
    )
 {
   using namespace std;
@@ -93,8 +96,8 @@ void createWatchers(const edm::ParameterSet& iP,
       throw SimG4Exception("Unable to find the requested Watcher");
     }
     
-    boost::shared_ptr<SimWatcher> watcherTemp;
-    boost::shared_ptr<SimProducer> producerTemp;
+    std::shared_ptr<SimWatcher> watcherTemp;
+    std::shared_ptr<SimProducer> producerTemp;
     maker->make(*itWatcher,iReg,watcherTemp,producerTemp);
     oWatchers.push_back(watcherTemp);
     if(producerTemp) {
@@ -103,7 +106,6 @@ void createWatchers(const edm::ParameterSet& iP,
   }
 }
 
-//RunManager::RunManager(edm::ParameterSet const & p, edm::ConsumesCollector && iC) 
 RunManager::RunManager(edm::ParameterSet const & p) 
   :   m_generator(0), m_nonBeam(p.getParameter<bool>("NonBeamEvent")), 
       m_primaryTransformer(0), 
@@ -124,23 +126,18 @@ RunManager::RunManager(edm::ParameterSet const & p)
       m_pStackingAction(p.getParameter<edm::ParameterSet>("StackingAction")),
       m_pTrackingAction(p.getParameter<edm::ParameterSet>("TrackingAction")),
       m_pSteppingAction(p.getParameter<edm::ParameterSet>("SteppingAction")),
+      m_g4overlap(p.getParameter<edm::ParameterSet>("G4CheckOverlap")),
       m_G4Commands(p.getParameter<std::vector<std::string> >("G4Commands")),
-      m_p(p), m_fieldBuilder(0),
+      m_p(p), m_fieldBuilder(0), m_chordFinderSetter(nullptr),
       m_theLHCTlinkTag(p.getParameter<edm::InputTag>("theLHCTlinkTag"))
 {    
-  //m_HepMC = iC.consumes<edm::HepMCProduct>(p.getParameter<edm::InputTag>("HepMCProduct"));
+  m_kernel = new G4RunManagerKernel();
 
-  m_kernel = G4RunManagerKernel::GetRunManagerKernel();
-  if (m_kernel==0) m_kernel = new G4RunManagerKernel();
-
-  m_CustomExceptionHandler = new ExceptionHandler(this) ;
-    
   m_check = p.getUntrackedParameter<bool>("CheckOverlap",false);
   m_WriteFile = p.getUntrackedParameter<std::string>("FileNameGDML","");
+  m_FieldFile = p.getUntrackedParameter<std::string>("FileNameField","");
+  m_RegionFile = p.getUntrackedParameter<std::string>("FileNameRegions","");
 
-  m_currentRun = 0;
-  m_currentEvent = 0;
-  m_simEvent = 0;
   m_userRunAction = 0;
   m_runInterface = 0;
 
@@ -160,6 +157,9 @@ RunManager::RunManager(edm::ParameterSet const & p)
 
 RunManager::~RunManager() 
 { 
+  if (!m_runTerminated) { terminateRun(); }
+  G4StateManager::GetStateManager()->SetNewState(G4State_Quit);
+  G4GeometryManager::GetInstance()->OpenGeometry();
   //   if (m_kernel!=0) delete m_kernel; 
   delete m_runInterface;
 }
@@ -191,13 +191,8 @@ void RunManager::initG4(const edm::EventSetup & es)
    
   G4LogicalVolumeToDDLogicalPartMap map_;
   SensitiveDetectorCatalog catalog_;
-  const DDDWorld * world = new DDDWorld(&(*pDD), map_, catalog_, m_check);
+  const DDDWorld * world = new DDDWorld(&(*pDD), map_, catalog_, false);
   m_registry.dddWorldSignal_(world);
-
-  if("" != m_WriteFile) {
-    G4GDMLParser gdml;
-    gdml.Write(m_WriteFile, world->GetWorldVolume());
-  }
 
   if (m_pUseMagneticField)
     {
@@ -206,10 +201,16 @@ void RunManager::initG4(const edm::EventSetup & es)
       es.get<IdealMagneticFieldRecord>().get(pMF);
       const GlobalPoint g(0.,0.,0.);
 
+      m_chordFinderSetter = new sim::ChordFinderSetter();
       m_fieldBuilder = new sim::FieldBuilder(&(*pMF), m_pField);
       G4TransportationManager * tM = 
 	G4TransportationManager::GetTransportationManager();
-      m_fieldBuilder->build( tM->GetFieldManager(),tM->GetPropagatorInField());
+      m_fieldBuilder->build( tM->GetFieldManager(),
+			     tM->GetPropagatorInField(),
+                             m_chordFinderSetter);
+      if("" != m_FieldFile) { 
+	DumpMagneticField(tM->GetFieldManager()->GetDetectorField()); 
+      }
     }
 
   // we need the track manager now
@@ -220,17 +221,19 @@ void RunManager::initG4(const edm::EventSetup & es)
   
   std::pair< std::vector<SensitiveTkDetector*>,
     std::vector<SensitiveCaloDetector*> > sensDets = 
-    m_attach->create(*world,(*pDD),catalog_,m_p,m_trackManager.get(),m_registry);
+    m_attach->create(*world,(*pDD),catalog_,m_p,m_trackManager.get(),
+		     m_registry);
       
   m_sensTkDets.swap(sensDets.first);
   m_sensCaloDets.swap(sensDets.second);
      
-  edm::LogInfo("SimG4CoreApplication") << " RunManager: Sensitive Detector "
-				       << "building finished; found " 
-				       << m_sensTkDets.size()
-                                       << " Tk type Producers, and " 
-				       << m_sensCaloDets.size() 
-				       << " Calo type producers ";
+  edm::LogInfo("SimG4CoreApplication") 
+    << " RunManager: Sensitive Detector "
+    << "building finished; found " 
+    << m_sensTkDets.size()
+    << " Tk type Producers, and " 
+    << m_sensCaloDets.size() 
+    << " Calo type producers ";
 
   edm::ESHandle<HepPDT::ParticleDataTable> fTable;
   es.get<PDTRecord>().get(fTable);
@@ -245,25 +248,38 @@ void RunManager::initG4(const edm::EventSetup & es)
     throw SimG4Exception("Unable to find the Physics list requested");
   }
   m_physicsList = 
-    physicsMaker->make(map_,fPDGTable,m_fieldBuilder,m_pPhysics,m_registry);
+    physicsMaker->make(map_,fPDGTable,m_chordFinderSetter,m_pPhysics,m_registry);
 
   PhysicsList* phys = m_physicsList.get(); 
-  if (phys==0) { throw SimG4Exception("Physics list construction failed!"); }
+  if (phys==0) { 
+    throw SimG4Exception("Physics list construction failed!"); 
+  }
 
-  // adding GFlash, Russian Roulette for eletrons and gamma, step limiters
-  // on top of any Physics Lists
+  // adding GFlash, Russian Roulette for eletrons and gamma, 
+  // step limiters on top of any Physics Lists
   phys->RegisterPhysics(new ParametrisedEMPhysics("EMoptions",m_pPhysics));
-  
-  m_kernel->SetPhysics(phys);
-  m_kernel->InitializePhysics();
 
   m_physicsList->ResetStoredInAscii();
   std::string tableDir = m_PhysicsTablesDir;
   if (m_RestorePhysicsTables) {
     m_physicsList->SetPhysicsTableRetrieved(tableDir);
   } 
+  edm::LogInfo("SimG4CoreApplication") 
+    << "RunManager: start initialisation of PhysicsList";
+
+  int verb = m_pPhysics.getUntrackedParameter<int>("Verbosity",0);
+  m_physicsList->SetDefaultCutValue(m_pPhysics.getParameter<double>("DefaultCutValue")*CLHEP::cm);
+  m_physicsList->SetCutsWithDefault();
+  m_prodCuts.reset(new DDG4ProductionCuts(map_, verb, m_pPhysics));	
+  m_prodCuts->update();
+  
+  m_kernel->SetPhysics(phys);
+  m_kernel->InitializePhysics();
+
   if (m_kernel->RunInitialization()) { m_managerInitialized = true; }
-  else { throw SimG4Exception("G4RunManagerKernel initialization failed!"); }
+  else { 
+    throw SimG4Exception("G4RunManagerKernel initialization failed!"); 
+  }
   
   if (m_StorePhysicsTables)
     {
@@ -281,11 +297,25 @@ void RunManager::initG4(const edm::EventSetup & es)
   
   initializeUserActions();
   
-  for (unsigned it=0; it<m_G4Commands.size(); it++) {
-    edm::LogInfo("SimG4CoreApplication") << "RunManager:: Requests UI: "
-                                         << m_G4Commands[it];
-    G4UImanager::GetUIpointer()->ApplyCommand(m_G4Commands[it]);
+  if(0 < m_G4Commands.size()) {
+    G4cout << "RunManager: Requested UI commands: " << G4endl;
+    for (unsigned it=0; it<m_G4Commands.size(); ++it) {
+      G4cout << "    " << m_G4Commands[it] << G4endl;
+      G4UImanager::GetUIpointer()->ApplyCommand(m_G4Commands[it]);
+    }
   }
+
+  if("" != m_WriteFile) {
+    G4GDMLParser gdml;
+    gdml.Write(m_WriteFile, world->GetWorldVolume(), true);
+  }
+
+  if("" != m_RegionFile) {
+    G4RegionReporter rrep;
+    rrep.ReportRegions(m_RegionFile);
+  }
+
+  if(m_check) { G4CheckOverlap check(m_g4overlap); }
 
   // If the Geant4 particle table is needed, decomment the lines below
   //
@@ -294,7 +324,12 @@ void RunManager::initG4(const edm::EventSetup & es)
   
   initializeRun();
   firstRun= false;
+}
 
+void RunManager::stopG4()
+{
+  G4StateManager::GetStateManager()->SetNewState(G4State_Quit);
+  if (!m_runTerminated) { terminateRun(); }
 }
 
 void RunManager::produce(edm::Event& inpevt, const edm::EventSetup & es)
@@ -334,7 +369,10 @@ G4Event * RunManager::generateEvent(edm::Event & inpevt)
   m_currentEvent = 0;
   if (m_simEvent!=0) { delete m_simEvent; }
   m_simEvent = 0;
-  G4Event * evt = new G4Event(inpevt.id().event());
+
+  // 64 bits event ID in CMSSW converted into Geant4 event ID
+  G4int evtid = (G4int)inpevt.id().event();
+  G4Event * evt = new G4Event(evtid);
   
   edm::Handle<edm::HepMCProduct> HepMCEvt;
   
@@ -361,6 +399,7 @@ G4Event * RunManager::generateEvent(edm::Event & inpevt)
 
 void RunManager::abortEvent()
 {
+  if (m_runTerminated) { return; }
   G4Track* t =
     m_kernel->GetEventManager()->GetTrackingManager()->GetTrack();
   t->SetTrackStatus(fStopAndKill) ;
@@ -376,7 +415,7 @@ void RunManager::abortEvent()
   // do NOT call this method for now
   // because it'll set abortRequested=true (withing G4EventManager)
   // this will make Geant4, in the event *next* after the aborted one
-  // NOT to get the primamry, thus there's NOTHING to trace, and it goes
+  // NOT to get the primary, thus there's NOTHING to trace, and it goes
   // to the end of G4Event::DoProcessing(G4Event*), where abortRequested
   // will be reset to true again
   //    
@@ -389,8 +428,6 @@ void RunManager::abortEvent()
      
   G4StateManager* stateManager = G4StateManager::GetStateManager();
   stateManager->SetNewState(G4State_GeomClosed);
-
-  return;
 }
 
 void RunManager::initializeUserActions()
@@ -419,14 +456,14 @@ void RunManager::initializeUserActions()
     Connect(userSteppingAction);
     eventManager->SetUserAction(userSteppingAction);
 
-    eventManager->SetUserAction(new StackingAction(m_pStackingAction));
+    eventManager->SetUserAction(new StackingAction(userTrackingAction, 
+						   m_pStackingAction));
 
   } else {
     edm::LogWarning("SimG4CoreApplication") << " RunManager: WARNING : "
 					    << "No generator; initialized "
 					    << "only RunAction!";
   }
-  return;
 }
 
 void RunManager::initializeRun()
@@ -437,27 +474,24 @@ void RunManager::initializeRun()
   if (m_userRunAction!=0) { m_userRunAction->BeginOfRunAction(m_currentRun); }
   m_runAborted = false;
   m_runInitialized = true;
-  return;
 }
  
 void RunManager::terminateRun()
 {
-  m_runTerminated = false;
   if (m_userRunAction!=0) {
     m_userRunAction->EndOfRunAction(m_currentRun);
     delete m_userRunAction; 
     m_userRunAction = 0;
   }
-  if (m_currentRun!=0) { 
-    delete m_currentRun; 
-    m_currentRun = 0; 
-  }
-  if (m_kernel!=0) {
+  if (m_kernel!=0 && !m_runTerminated) {
+    delete m_currentEvent;
+    m_currentEvent = 0;
+    delete m_simEvent;
+    m_simEvent = 0;
     m_kernel->RunTermination();
     m_runInitialized = false;
     m_runTerminated = true;
   }  
-  return;
 }
 
 void RunManager::abortRun(bool softAbort)
@@ -467,7 +501,7 @@ void RunManager::abortRun(bool softAbort)
   if (m_currentRun!=0) { delete m_currentRun; m_currentRun = 0; }
   m_runInitialized = false;
   m_runAborted = true;
-  return;
+  terminateRun();
 }
 
 void RunManager::resetGenParticleId( edm::Event& inpevt ) 
@@ -477,7 +511,6 @@ void RunManager::resetGenParticleId( edm::Event& inpevt )
   if ( theLHCTlink.isValid() ) {
     m_trackManager->setLHCTransportLink( theLHCTlink.product() );
   }
-  return;
 }
 
 SimTrackManager* RunManager::GetSimTrackManager()
@@ -506,4 +539,54 @@ void  RunManager::Connect(TrackingAction* trackingAction)
 void  RunManager::Connect(SteppingAction* steppingAction)
 {
   steppingAction->m_g4StepSignal.connect(m_registry.g4StepSignal_);
+}
+
+void RunManager::DumpMagneticField(const G4Field* field) const
+{
+  std::ofstream fout(m_FieldFile.c_str(), std::ios::out);
+  if(fout.fail()){
+    edm::LogWarning("SimG4CoreApplication") 
+      << " RunManager WARNING : "
+      << "error opening file <" << m_FieldFile << "> for magnetic field";
+  } else {
+    double rmax = 9000*mm;
+    double zmax = 16000*mm;
+
+    double dr = 5*cm;
+    double dz = 20*cm;
+
+    int nr = (int)(rmax/dr);
+    int nz = 2*(int)(zmax/dz);
+
+    double r = 0.0;
+    double z0 = -zmax;
+    double z;
+
+    double phi = 0.0;
+    double cosf = cos(phi);
+    double sinf = sin(phi);
+
+    double point[4] = {0.0,0.0,0.0,0.0};
+    double bfield[3] = {0.0,0.0,0.0};
+
+    fout << std::setprecision(6); 
+    for(int i=0; i<=nr; ++i) {
+      z = z0;
+      for(int j=0; j<=nz; ++j) {
+        point[0] = r*cosf;
+	point[1] = r*sinf;
+	point[2] = z;
+        field->GetFieldValue(point, bfield); 
+        fout << "R(mm)= " << r/mm << " phi(deg)= " << phi/degree 
+	     << " Z(mm)= " << z/mm << "   Bz(tesla)= " << bfield[2]/tesla 
+	     << " Br(tesla)= " << (bfield[0]*cosf + bfield[1]*sinf)/tesla
+	     << " Bphi(tesla)= " << (bfield[0]*sinf - bfield[1]*cosf)/tesla
+	     << G4endl;
+	z += dz;
+      }
+      r += dr;
+    }
+    
+    fout.close();
+  }
 }

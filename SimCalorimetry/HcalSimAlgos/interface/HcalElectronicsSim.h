@@ -13,6 +13,7 @@ class HODataFrame;
 class HFDataFrame;
 class ZDCDataFrame;
 class HcalUpgradeDataFrame;
+class QIE10DataFrame;
 
 class HcalAmplifier;
 class HcalCoderFactory;
@@ -24,7 +25,7 @@ namespace CLHEP {
 class HcalElectronicsSim {
 public:
   HcalElectronicsSim(HcalAmplifier * amplifier, 
-                     const HcalCoderFactory * coderFactory);
+                     const HcalCoderFactory * coderFactory, bool PreMix);
   ~HcalElectronicsSim();
 
   void setDbService(const HcalDbService * service);
@@ -34,6 +35,7 @@ public:
   void analogToDigital(CLHEP::HepRandomEngine*, CaloSamples & linearFrame, HFDataFrame & result);
   void analogToDigital(CLHEP::HepRandomEngine*, CaloSamples & linearFrame, ZDCDataFrame & result);
   void analogToDigital(CLHEP::HepRandomEngine*, CaloSamples & linearFrame, HcalUpgradeDataFrame& result);
+  void analogToDigital(CLHEP::HepRandomEngine*, CaloSamples & linearFrame, QIE10DataFrame& result);
   /// Things that need to be initialized every event
   /// sets starting CapID randomly
   void newEvent(CLHEP::HepRandomEngine*);
@@ -48,5 +50,6 @@ private:
 
   int theStartingCapId;
   bool theStartingCapIdIsRandom;
+  bool PreMixDigis;
 };
 #endif

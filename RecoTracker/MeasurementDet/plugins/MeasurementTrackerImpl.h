@@ -29,20 +29,18 @@
 #include <unordered_map>
 #include <vector>
 
-class StrictWeakOrdering{
- public:
-  bool operator() ( uint32_t p,const uint32_t& i) const {return p < i;}
-};
 
 class TkStripMeasurementDet;
 class TkPixelMeasurementDet;
 class TkGluedMeasurementDet;
+class TkStackMeasurementDet;
 class GeometricSearchTracker;
 class SiStripRecHitMatcher;
 class GluedGeomDet;
+class StackGeomDet;
 class SiPixelFedCabling;
 
-class MeasurementTrackerImpl final : public MeasurementTracker {
+class dso_hidden MeasurementTrackerImpl final : public MeasurementTracker {
 public:
    enum QualityFlags { BadModules=1, // for everybody
                        /* Strips: */ BadAPVFibers=2, BadStrips=4, MaskBad128StripBlocks=8, 
@@ -101,6 +99,7 @@ public:
   const std::vector<TkStripMeasurementDet>& stripDets() const {return theStripDets;}
   const std::vector<TkPixelMeasurementDet>& pixelDets() const {return thePixelDets;}
   const std::vector<TkGluedMeasurementDet>& gluedDets() const {return theGluedDets;}
+  const std::vector<TkStackMeasurementDet>& stackDets() const {return theStackDets;}
 
   virtual const StMeasurementConditionSet & stripDetConditions() const { return theStDetConditions; }
   virtual const PxMeasurementConditionSet & pixelDetConditions() const { return thePxDetConditions; }
@@ -117,6 +116,7 @@ public:
   std::vector<TkPixelMeasurementDet> thePixelDets;
   std::vector<TkStripMeasurementDet> theStripDets;
   std::vector<TkGluedMeasurementDet> theGluedDets;
+  std::vector<TkStackMeasurementDet> theStackDets;
 
   const SiPixelFedCabling*              thePixelCabling;
 
@@ -128,11 +128,15 @@ public:
   void addPixelDet( const GeomDet* gd);
 
   void addGluedDet( const GluedGeomDet* gd);
+  void addStackDet( const StackGeomDet* gd);
+
   void initGluedDet( TkGluedMeasurementDet & det);
+  void initStackDet( TkStackMeasurementDet & det);
 
-  void addPixelDets( const TrackingGeometry::DetContainer& dets);
+  void addDets( const TrackingGeometry::DetContainer& dets, bool subIsPixel);
 
-  void addStripDets( const TrackingGeometry::DetContainer& dets);
+  bool checkDets();
+
 
   void initializeStripStatus (const SiStripQuality *stripQuality, int qualityFlags, int qualityDebugFlags);
 

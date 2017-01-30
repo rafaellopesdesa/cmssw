@@ -98,11 +98,11 @@ void RPCMonitorDigi::bookSectorRingME(DQMStore::IBooker & ibooker, const std::st
 	os<<"Occupancy_Wheel_"<<wheel<<"_Sector_"<<sector;
     
 	if (sector==9 || sector==11)
-	  meMap[os.str()] = ibooker.book2D(os.str(), os.str(),  90, 0.5,  90.5, 15, 0.5, 15.5);
+	  meMap[os.str()] = ibooker.book2D(os.str(), os.str(),  91, 0.5,  91.5, 15, 0.5, 15.5);
 	else  if (sector==4) 
-	  meMap[os.str()] = ibooker.book2D(os.str(), os.str(),  90, 0.5,  90.5, 21, 0.5, 21.5);
+	  meMap[os.str()] = ibooker.book2D(os.str(), os.str(),  91, 0.5,  91.5, 21, 0.5, 21.5);
 	else
-	  meMap[os.str()] = ibooker.book2D(os.str(), os.str(),  90, 0.5,  90.5, 17, 0.5, 17.5);
+	  meMap[os.str()] = ibooker.book2D(os.str(), os.str(),  91, 0.5,  91.5, 17, 0.5, 17.5);
 	
 	meMap[os.str()]->setAxisTitle("strip", 1);
 	rpcdqm::utils rpcUtils;
@@ -278,11 +278,11 @@ void RPCMonitorDigi::bookWheelDiskME(DQMStore::IBooker & ibooker,const std::stri
    for(int ring = RPCMonitorDigi::numberOfInnerRings_  ; ring <= 3 ; ring ++){
      os.str("");
      os<<"1DOccupancy_Ring_"<<ring;
-     meMap[os.str()] = ibooker.book1D(os.str(), os.str(), 6 , 0.5, 6.5);
-     for(int xbin= 1 ; xbin<= 6 ; xbin++) {
+     meMap[os.str()] = ibooker.book1D(os.str(), os.str(),  RPCMonitorDigi::numberOfDisks_*2 , 0.5,  ((double)RPCMonitorDigi::numberOfDisks_*2.0)+0.5);
+     for(int xbin= 1 ; xbin<=  RPCMonitorDigi::numberOfDisks_*2 ; xbin++) {
        label.str("");
-       if (xbin < 4) label<<"Disk "<< (xbin - 4);
-       else label<<"Disk "<< (xbin - 3);
+       if (xbin <  RPCMonitorDigi::numberOfDisks_+1) label<<"Disk "<< (xbin -(RPCMonitorDigi::numberOfDisks_+1));
+       else label<<"Disk "<< (xbin -  RPCMonitorDigi::numberOfDisks_);
        meMap[os.str()] ->setBinLabel(xbin, label.str(), 1); 
      }
    }
@@ -395,17 +395,17 @@ void RPCMonitorDigi::bookRegionME(DQMStore::IBooker &ibooker,const std::string &
   }
 
 
-   meMap["Occupancy_for_Endcap"] = ibooker.book2D("Occupancy_for_Endcap", "Occupancy Endcap", 6, 0.5, 6.5, 2, 1.5, 3.5);
+  meMap["Occupancy_for_Endcap"] = ibooker.book2D("Occupancy_for_Endcap", "Occupancy Endcap",  (int)RPCMonitorDigi::numberOfDisks_*2.0 , 0.5,  ((float)RPCMonitorDigi::numberOfDisks_*2.0)+0.5, 2, 1.5, 3.5);
   meMap["Occupancy_for_Endcap"] ->setAxisTitle("Disk", 1);
   meMap["Occupancy_for_Endcap"] ->setAxisTitle("Ring", 2);
 
   std::stringstream binlabel;
-  for (int bin = 1 ; bin <= 6 ; bin++){
+  for (int bin = 1 ; bin <=  RPCMonitorDigi::numberOfDisks_*2 ; bin++){
     binlabel.str("");
-    if(bin<4) {//negative endcap
-      binlabel<<(bin-4); 
+    if(bin< (RPCMonitorDigi::numberOfDisks_+1)) {//negative endcap
+      binlabel<<(bin-( RPCMonitorDigi::numberOfDisks_+1)); 
     }else{//positive endcaps
-      binlabel<<(bin-3); 
+      binlabel<<(bin- RPCMonitorDigi::numberOfDisks_); 
     }
     meMap["Occupancy_for_Endcap"]->setBinLabel( bin , binlabel.str(), 1);
   }

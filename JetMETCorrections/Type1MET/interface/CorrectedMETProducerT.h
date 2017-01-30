@@ -18,16 +18,20 @@
  *
  */
 
-#include "FWCore/Framework/interface/EDProducer.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Utilities/interface/InputTag.h"
 #include "FWCore/Framework/interface/ConsumesCollector.h"
+#include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 
 #include "JetMETCorrections/Type1MET/interface/METCorrectionAlgorithm.h"
 #include "DataFormats/METReco/interface/CorrMETData.h"
 #include "DataFormats/Candidate/interface/Candidate.h"
+
+#include "HLTrigger/HLTcore/interface/defaultModuleLabel.h"
 
 #include <vector>
 
@@ -61,7 +65,7 @@ namespace CorrectedMETProducer_namespace
 }
 
 template<typename T>
-class CorrectedMETProducerT : public edm::EDProducer  
+class CorrectedMETProducerT : public edm::stream::EDProducer<>  
 {
   typedef std::vector<T> METCollection;
 
@@ -82,6 +86,12 @@ class CorrectedMETProducerT : public edm::EDProducer
     delete algorithm_;
   }
     
+  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+    edm::ParameterSetDescription desc;
+    desc.add<edm::InputTag>("src",edm::InputTag("corrPfMetType1", "type1"));
+    descriptions.add(defaultModuleLabel<CorrectedMETProducerT<T> >(),desc);
+  }
+
  private:
 
   void produce(edm::Event& evt, const edm::EventSetup& es)
@@ -94,8 +104,8 @@ class CorrectedMETProducerT : public edm::EDProducer
     for ( typename METCollection::const_iterator rawMEt = rawMEtCollection->begin();
 	  rawMEt != rawMEtCollection->end(); ++rawMEt ) {
       CorrMETData correction = algorithm_->compMETCorrection(evt, es);
-      
-      static CorrectedMETProducer_namespace::CorrectedMETFactoryT<T> correctedMET_factory;
+
+      static const CorrectedMETProducer_namespace::CorrectedMETFactoryT<T> correctedMET_factory {};
       T correctedMEt = correctedMET_factory(*rawMEt, correction);
 
       correctedMEtCollection->push_back(correctedMEt);

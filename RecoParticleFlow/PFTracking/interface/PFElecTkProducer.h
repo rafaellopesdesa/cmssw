@@ -4,7 +4,7 @@
 #include "DataFormats/ParticleFlowReco/interface/PFConversion.h"
 #include "DataFormats/ParticleFlowReco/interface/PFV0.h"
 
-#include "FWCore/Framework/interface/EDProducer.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -25,6 +25,8 @@
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
 #include "DataFormats/ParticleFlowReco/interface/PFDisplacedTrackerVertex.h"
 
+#include "RecoParticleFlow/PFTracking/interface/ConvBremHeavyObjectCache.h"
+
 class PFTrackTransformer;
 class GsfTrack;
 class MagneticField;
@@ -41,11 +43,22 @@ class ConvBremPFTrackFinder;
  and transform them in PFGsfRecTracks.
 */
 
-class PFElecTkProducer : public edm::EDProducer {
+
+
+class PFElecTkProducer final : public edm::stream::EDProducer<edm::GlobalCache<convbremhelpers::HeavyObjectCache> > {
  public:
   
      ///Constructor
-     explicit PFElecTkProducer(const edm::ParameterSet&);
+  explicit PFElecTkProducer(const edm::ParameterSet&, const convbremhelpers::HeavyObjectCache*);
+
+
+  static std::unique_ptr<convbremhelpers::HeavyObjectCache> 
+    initializeGlobalCache( const edm::ParameterSet& conf ) {
+       return std::unique_ptr<convbremhelpers::HeavyObjectCache>(new convbremhelpers::HeavyObjectCache(conf));
+   }
+  
+  static void globalEndJob(convbremhelpers::HeavyObjectCache const* ) {
+  }
 
      ///Destructor
      ~PFElecTkProducer();
@@ -61,7 +74,7 @@ class PFElecTkProducer : public edm::EDProducer {
       int FindPfRef(const reco::PFRecTrackCollection & PfRTkColl, 
 		    const reco::GsfTrack&, bool);
       
-      bool isFifthStep(reco::PFRecTrackRef pfKfTrack);
+
 
       bool applySelection(const reco::GsfTrack&);
       
@@ -73,15 +86,15 @@ class PFElecTkProducer : public edm::EDProducer {
       float minTangDist(const reco::GsfPFRecTrack& primGsf,
 			const reco::GsfPFRecTrack& secGsf); 
       
-      bool isSameEgSC(const reco::ElectronSeedRef& nSeedRef,
-		      const reco::ElectronSeedRef& iSeedRef,
+      bool isSameEgSC(const reco::ElectronSeed& nSeed,
+		      const reco::ElectronSeed& iSeed,
 		      bool& bothGsfEcalDriven,
 		      float& SCEnergy);
 
       bool isSharingEcalEnergyWithEgSC(const reco::GsfPFRecTrack& nGsfPFRecTrack,
 				       const reco::GsfPFRecTrack& iGsfPFRecTrack,
-				       const reco::ElectronSeedRef& nSeedRef,
-				       const reco::ElectronSeedRef& iSeedRef,
+				       const reco::ElectronSeed& nSeed,
+				       const reco::ElectronSeed& iSeed,
 				       const reco::PFClusterCollection& theEClus,
 				       bool& bothGsfTrackerDriven,
 				       bool& nEcalDriven,
@@ -120,10 +133,10 @@ class PFElecTkProducer : public edm::EDProducer {
       double dphiCutGsfClean_;
 
       ///PFTrackTransformer
-      PFTrackTransformer *pfTransformer_;     
+      std::unique_ptr<PFTrackTransformer> pfTransformer_;     
       const MultiTrajectoryStateMode *mtsMode_;
       MultiTrajectoryStateTransform  mtsTransform_;
-      ConvBremPFTrackFinder *convBremFinder_;
+      std::unique_ptr<ConvBremPFTrackFinder> convBremFinder_;
 
 
       ///Trajectory of GSfTracks in the event?
@@ -131,7 +144,6 @@ class PFElecTkProducer : public edm::EDProducer {
       bool modemomentum_;
       bool applySel_;
       bool applyGsfClean_;
-      bool useFifthStep_;
       bool useFifthStepForEcalDriven_;
       bool useFifthStepForTrackDriven_;
       //   bool useFifthStepSec_;

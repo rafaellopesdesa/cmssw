@@ -223,15 +223,17 @@ if __name__ == '__main__':
 
     (options,args)=oparser.parse_args()
 
+    #Need to not have ROOT load .rootlogon.(C|py) since it can cause interference.
+    # The only way to do that is to pass -n from the command line
+    import sys
+    sys.argv.append("-n")
+
     import ROOT
     if options.library is None:
         if 0 != ROOT.gSystem.Load("libFWCoreFWLite"):
             raise RuntimeError("failed to load libFWCoreFWLite")
-        ROOT.AutoLibraryLoader.enable()
+        ROOT.fwlite.enable()
     else:
-        if 0 != ROOT.gSystem.Load("libCintex"):
-            raise RuntimeError("failed to load libCintex")
-        ROOT.Cintex.Enable()
         if 0 != ROOT.gSystem.Load(options.library):
             raise RuntimeError("failed to load library '"+options.library+"'")
 

@@ -35,7 +35,7 @@
 #include <vector>
 #include <string>
 
-class CrossingFramePlaybackInfoExtended;
+class CrossingFramePlaybackInfoNew;
 class DigiAccumulatorMixMod;
 class PileUpEventPrincipal;
 
@@ -51,7 +51,7 @@ namespace edm {
       typedef std::vector<DigiAccumulatorMixMod*> Accumulators;
 
       /** standard constructor*/
-      explicit MixingModule(const edm::ParameterSet& ps);
+      explicit MixingModule(const edm::ParameterSet& ps, MixingCache::Config const* globalConf);
 
       /**Default destructor*/
       virtual ~MixingModule();
@@ -90,7 +90,7 @@ namespace edm {
       InputTag inputTagPlayback_;
       bool mixProdStep2_;
       bool mixProdStep1_;
-      CrossingFramePlaybackInfoExtended *playbackInfo_;
+      CrossingFramePlaybackInfoNew *playbackInfo_;
 
       std::vector<AdjusterBase *> adjusters_;
       std::vector<AdjusterBase *> adjustersObjects_;

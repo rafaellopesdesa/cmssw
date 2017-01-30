@@ -11,7 +11,7 @@
  *
  */
 
-#include "FWCore/Framework/interface/EDProducer.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
@@ -49,7 +49,7 @@
 #include <functional>
 #include <math.h>
 
-class PFRecoTauChargedHadronProducer : public edm::EDProducer 
+class PFRecoTauChargedHadronProducer : public edm::stream::EDProducer<> 
 {
 public:
   typedef reco::tau::PFRecoTauChargedHadronBuilderPlugin Builder;
@@ -152,8 +152,11 @@ void PFRecoTauChargedHadronProducer::produce(edm::Event& evt, const edm::EventSe
   // make our association
   std::auto_ptr<reco::PFJetChargedHadronAssociation> pfJetChargedHadronAssociations;
 
+
   if ( pfJets.size() ) {
-    pfJetChargedHadronAssociations.reset(new reco::PFJetChargedHadronAssociation(reco::PFJetRefProd(pfJets)));
+    edm::Handle<reco::PFJetCollection> pfJetCollectionHandle;
+    evt.get(pfJets.id(), pfJetCollectionHandle);
+    pfJetChargedHadronAssociations.reset(new reco::PFJetChargedHadronAssociation(reco::PFJetRefProd(pfJetCollectionHandle)));
   } else {
     pfJetChargedHadronAssociations.reset(new reco::PFJetChargedHadronAssociation);
   }

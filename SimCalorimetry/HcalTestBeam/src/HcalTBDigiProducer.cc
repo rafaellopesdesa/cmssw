@@ -17,7 +17,7 @@
 #include "SimDataFormats/EcalTestBeam/interface/PEcalTBInfo.h"
 #include "SimGeneral/MixingModule/interface/PileUpEventPrincipal.h"
 
-HcalTBDigiProducer::HcalTBDigiProducer(const edm::ParameterSet& ps, edm::one::EDProducerBase& mixMod, edm::ConsumesCollector& iC) :
+HcalTBDigiProducer::HcalTBDigiProducer(const edm::ParameterSet& ps, edm::stream::EDProducerBase& mixMod, edm::ConsumesCollector& iC) :
   theParameterMap(new HcalTBSimParameterMap(ps)), 
   theHcalShape(new HcalShape()),
   theHcalIntegratedShape(new CaloShapeIntegrator(theHcalShape)),
@@ -47,9 +47,11 @@ HcalTBDigiProducer::HcalTBDigiProducer(const edm::ParameterSet& ps, edm::one::ED
   }
 
   bool doNoise = ps.getParameter<bool>("doNoise");
-  theAmplifier = new HcalAmplifier(theParameterMap, doNoise);
+  bool dummy1 = false; 
+  bool dummy2 = false;  // extra arguments for premixing
+  theAmplifier = new HcalAmplifier(theParameterMap, doNoise, dummy1, dummy2);
   theCoderFactory = new HcalCoderFactory(HcalCoderFactory::DB);
-  theElectronicsSim = new HcalElectronicsSim(theAmplifier, theCoderFactory);
+  theElectronicsSim = new HcalElectronicsSim(theAmplifier, theCoderFactory, dummy1);
 
   theHBHEDigitizer = new HBHEDigitizer(theHBHEResponse, theElectronicsSim, doNoise);
   theHODigitizer = new HODigitizer(theHOResponse, theElectronicsSim, doNoise);

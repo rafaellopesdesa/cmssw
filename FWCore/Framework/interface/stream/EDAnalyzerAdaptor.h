@@ -28,35 +28,13 @@
 #include "FWCore/Framework/interface/stream/EDAnalyzerAdaptorBase.h"
 #include "FWCore/Framework/interface/stream/callAbilities.h"
 #include "FWCore/Framework/interface/stream/dummy_helpers.h"
+#include "FWCore/Framework/interface/stream/makeGlobal.h"
 #include "FWCore/Framework/src/MakeModuleHelper.h"
 
 // forward declarations
 
 namespace edm {
   namespace stream {
-
-    namespace impl {
-      template<typename T, typename G>
-      std::unique_ptr<G> makeGlobal(edm::ParameterSet const& iPSet, G const*) {
-        return T::initializeGlobalCache(iPSet);
-      }
-      template<typename T>
-      dummy_ptr makeGlobal(edm::ParameterSet const& iPSet, void const*) {
-        return dummy_ptr();
-      }
-      
-      template< typename T, typename G>
-      T* makeStreamModule(edm::ParameterSet const& iPSet,
-                                          G const* iGlobal) {
-        return new T(iPSet,iGlobal);
-      }
-
-      template< typename T>
-      T* makeStreamModule(edm::ParameterSet const& iPSet,
-                                          void const* ) {
-        return new T(iPSet);
-      }
-    }
 
     template<typename ABase, typename ModType> struct BaseToAdaptor;
 
@@ -131,7 +109,7 @@ namespace edm {
         MyGlobalLuminosityBlockSummary::streamEndLuminosityBlockSummary(iProd,iLumi,iES,s);
       }
 
-      void doBeginRun(RunPrincipal& rp,
+      void doBeginRun(RunPrincipal const& rp,
                       EventSetup const& c,
                       ModuleCallingContext const* mcc) override final {
         if(T::HasAbility::kRunCache or T::HasAbility::kRunSummaryCache) {
@@ -144,7 +122,7 @@ namespace edm {
           MyGlobalRunSummary::beginRun(cnstR,c,&rc,m_runSummaries[ri]);
         }
       }
-      void doEndRun(RunPrincipal& rp,
+      void doEndRun(RunPrincipal const& rp,
                     EventSetup const& c,
                     ModuleCallingContext const* mcc) override final
       {
@@ -160,7 +138,7 @@ namespace edm {
         }
       }
 
-      void doBeginLuminosityBlock(LuminosityBlockPrincipal& lbp,
+      void doBeginLuminosityBlock(LuminosityBlockPrincipal const& lbp,
                                   EventSetup const& c,
                                   ModuleCallingContext const* mcc) override final
       {
@@ -177,7 +155,7 @@ namespace edm {
         }
         
       }
-      void doEndLuminosityBlock(LuminosityBlockPrincipal& lbp,
+      void doEndLuminosityBlock(LuminosityBlockPrincipal const& lbp,
                                 EventSetup const& c,
                                 ModuleCallingContext const* mcc) override final {
         if(T::HasAbility::kLuminosityBlockCache or T::HasAbility::kLuminosityBlockSummaryCache) {

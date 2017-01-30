@@ -67,7 +67,7 @@ class HLTMuonMatchAndPlot
                       const std::vector<std::string>&);
 
   // Analyzer Methods
-  void beginRun(const edm::Run &, const edm::EventSetup &);
+  void beginRun(DQMStore::IBooker &, const edm::Run &, const edm::EventSetup &);
   void analyze(edm::Handle<reco::MuonCollection> &, edm::Handle<reco::BeamSpot> &, 
 	       edm::Handle<reco::VertexCollection> &, edm::Handle<trigger::TriggerEvent> &, 
 	       edm::Handle<edm::TriggerResults> &);
@@ -84,18 +84,20 @@ class HLTMuonMatchAndPlot
  private:
 
   // Internal Methods
-  void book1D(std::string, std::string, std::string);
-  void book2D(std::string, std::string, std::string, std::string);
+  void book1D(DQMStore::IBooker &, std::string, std::string, std::string);
+  void book2D(DQMStore::IBooker &, std::string, std::string, std::string, std::string);
   reco::MuonCollection selectedMuons(
     const reco::MuonCollection &,
     const reco::BeamSpot &,
     bool,    
     const StringCutObjectSelector<reco::Muon> &,
     double, double);
+
   trigger::TriggerObjectCollection selectedTriggerObjects(
     const trigger::TriggerObjectCollection &,
     const trigger::TriggerEvent &,
-    const edm::ParameterSet &);
+    bool hasTriggerCuts,
+    const StringCutObjectSelector<trigger::TriggerObject> triggerSelector);
  
   // Input from Configuration File
   std::string hltProcessName_;
@@ -111,7 +113,6 @@ class HLTMuonMatchAndPlot
   unsigned int cutMinPt_;
   std::string hltPath_;
   std::vector<std::string> moduleLabels_;
-  DQMStore * dbe_;
   std::map<std::string, MonitorElement *> hists_;
   
   // Selectors
@@ -121,9 +122,14 @@ class HLTMuonMatchAndPlot
   StringCutObjectSelector<reco::Muon> targetMuonSelector_;
   double targetZ0Cut_; 
   double targetD0Cut_;
+  double targetptCutZ_;
+  double targetptCutJpsi_;
   StringCutObjectSelector<reco::Muon> probeMuonSelector_;
   double probeZ0Cut_; 
   double probeD0Cut_;
+
+  StringCutObjectSelector<trigger::TriggerObject> triggerSelector_;
+  bool hasTriggerCuts_;
 
 };
 

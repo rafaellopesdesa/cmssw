@@ -23,6 +23,7 @@
 #include "DataFormats/SiPixelCluster/interface/SiPixelCluster.h"
 #include "DataFormats/Common/interface/DetSetVectorNew.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "DQMServices/Core/interface/DQMStore.h"
 #include <boost/cstdint.hpp>
 
 #include "FWCore/Framework/interface/ESHandle.h"
@@ -35,6 +36,8 @@
 #include "Geometry/Records/interface/TrackerDigiGeometryRecord.h"
 #include "Geometry/TrackerNumberingBuilder/interface/GeometricDet.h"
 #include "Geometry/TrackerGeometryBuilder/interface/PixelGeomDetType.h"
+#include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
+
 class SiPixelClusterModule {        
 
  public:
@@ -51,10 +54,16 @@ class SiPixelClusterModule {
   typedef edmNew::DetSet<SiPixelCluster>::const_iterator    ClusterIterator;
 
   /// Book histograms
-  void book(const edm::ParameterSet& iConfig, int type=0, bool twoD=true, bool reducedSet=false, bool isUpgrade=false);
+  void book(const edm::ParameterSet& iConfig, const edm::EventSetup& iSetup, DQMStore::IBooker & iBooker, int type=0, bool twoD=true, bool reducedSet=false, bool isUpgrade=false);
   /// Fill histograms
   int fill(const edmNew::DetSetVector<SiPixelCluster> & input, 
-            const TrackerGeometry* tracker,
+	    const TrackerGeometry* tracker,
+	    int *barrelClusterTotal,
+	    int *fpixPClusterTotal,
+	    int *fpixMClusterTotal,
+	    std::vector<MonitorElement*>& layers,
+	    std::vector<MonitorElement*>& diskspz,
+	    std::vector<MonitorElement*>& disksmz,
             bool modon=true, 
 	    bool ladon=false, 
 	    bool layon=false, 
@@ -69,6 +78,7 @@ class SiPixelClusterModule {
   
  private:
 
+  const TrackerTopology *pTT;
   uint32_t id_;
   int ncols_;
   int nrows_;

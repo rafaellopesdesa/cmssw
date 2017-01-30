@@ -6,6 +6,7 @@
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/ConsumesCollector.h"
+#include "CalibTracker/Records/interface/SiStripQualityRcd.h"
 #endif
 
 #include "DataFormats/Common/interface/DetSetVector.h"
@@ -22,8 +23,10 @@
 #include "DataFormats/Common/interface/Handle.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "CalibFormats/SiStripObjects/interface/SiStripQuality.h"
-#include "CalibTracker/Records/interface/SiStripQualityRcd.h"
 
+namespace edm {
+  class EventSetup;
+};
 
 #include <string>
 
@@ -43,9 +46,8 @@ class ClusterSummarySingleMultiplicity {
 #ifndef __GCCXML__
   edm::EDGetTokenT<ClusterSummary> m_collection;
 #endif
-  int m_subdetenum;
-  std::string m_subdetvar;
-  std::vector<std::string> m_clustsummvar;
+  ClusterSummary::CMSTracker m_subdetenum;
+  ClusterSummary::VariablePlacement m_varenum;
   int m_mult;
     
 };

@@ -5,7 +5,7 @@
 
 namespace edm {
 
-  ProcessDesc::ProcessDesc(boost::shared_ptr<ParameterSet> pset) :
+  ProcessDesc::ProcessDesc(std::shared_ptr<ParameterSet> pset) :
       pset_(pset), services_(pset_->popVParameterSet(std::string("services")).release()) {
   }
 
@@ -16,16 +16,6 @@ namespace edm {
   }
 
   ProcessDesc::~ProcessDesc() {
-  }
-
-  boost::shared_ptr<ParameterSet>
-  ProcessDesc::getProcessPSet() const {
-    return pset_;
-  }
-
-  boost::shared_ptr<std::vector<ParameterSet> >
-  ProcessDesc::getServicesPSets() const {
-    return services_;
   }
 
   void ProcessDesc::addService(ParameterSet& pset) {

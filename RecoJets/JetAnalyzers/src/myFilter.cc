@@ -7,7 +7,7 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
 #include "DataFormats/Common/interface/Handle.h"
-#include "RecoLocalCalo/HcalRecAlgos/interface/HcalCaloFlagLabels.h"
+#include "DataFormats/METReco/interface/HcalCaloFlagLabels.h"
 
 #include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
 #include "DataFormats/HcalRecHit/interface/HcalSourcePositionData.h"
@@ -37,7 +37,6 @@
 
 
 // include files
-#include "CommonTools/RecoAlgos/interface/HBHENoiseFilter.h"
 #include "DataFormats/METReco/interface/HcalNoiseSummary.h"
 
 
@@ -679,7 +678,7 @@ myFilter::filter(edm::Event& evt, edm::EventSetup const& es) {
 
   edm::Handle< edmNew::DetSetVector<SiPixelCluster> > hClusterColl;
   evt.getByLabel("siPixelClusters", hClusterColl);
-  const edmNew::DetSetVector<SiPixelCluster> clustColl = *(hClusterColl.product());
+  auto const & clustColl = *(hClusterColl.product());
   //  nCl = clustColl.size();
 
   /***
@@ -697,7 +696,7 @@ myFilter::filter(edm::Event& evt, edm::EventSetup const& es) {
   //  evt.getByLabel("ctfWithMaterialTracks", trackCollection);
   evt.getByLabel("generalTracks", trackCollection);
   
-  const reco::TrackCollection tC = *(trackCollection.product());
+  auto const & tC = *(trackCollection.product());
   //  std::cout << "FIL: Reconstructed "<< tC.size() << " tracks" << std::endl ;
 
   if (tC.size() > 3) filter_NTrks = true;

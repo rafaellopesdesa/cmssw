@@ -11,7 +11,7 @@
  *  Local Coordinate system coincides with center of the box
  *  with X axis along the width and Y axis along the lenght.
  */
-class RectangularPlaneBounds GCC11_FINAL : public Bounds {
+class RectangularPlaneBounds final : public Bounds {
 public:
 
   /// Construct from  half width (extension in local X),
@@ -27,6 +27,8 @@ public:
   virtual float thickness() const { return 2*halfThickness;}
 
   // basic bounds function
+  using Bounds::inside;
+
   virtual bool inside( const Local2DPoint& p) const {
     return
      (std::abs(p.x()) < halfWidth) &

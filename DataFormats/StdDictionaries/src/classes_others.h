@@ -15,7 +15,9 @@ namespace DataFormats_StdDictionaries {
   std::allocator<short> ashort;
   std::basic_string<char> bschar;
   std::bidirectional_iterator_tag bidirectiter;
+  std::bitset<6> dummybitset6;
   std::bitset<7> dummybitset7;
+  std::bitset<15> dummybitset15;
   std::deque<int> dummy18;
   std::forward_iterator_tag fowitertag;
   std::input_iterator_tag initertag;

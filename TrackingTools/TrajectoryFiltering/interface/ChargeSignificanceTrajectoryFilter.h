@@ -16,7 +16,7 @@ public:
 
   explicit ChargeSignificanceTrajectoryFilter(float qsig):  theChargeSignificance(qsig) {}
 
-  explicit ChargeSignificanceTrajectoryFilter( const edm::ParameterSet & pset):
+  explicit ChargeSignificanceTrajectoryFilter( const edm::ParameterSet & pset, edm::ConsumesCollector& iC):
     theChargeSignificance(pset.getParameter<double>("chargeSignificance")) {}
 
   virtual bool qualityFilter( const Trajectory& traj) const { return traj.isValid();}
@@ -59,6 +59,7 @@ protected:
 	//
 	if (significance*qSig<0) {
 	    traj.invalidate();
+            traj.setStopReason(StopReason::CHARGE_SIGNIFICANCE);
 	    return false;
 	}
       }

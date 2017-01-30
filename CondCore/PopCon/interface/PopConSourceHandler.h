@@ -1,13 +1,8 @@
 #ifndef  PopConSourceHandler_H
 #define  PopConSourceHandler_H
 
-//#include "CondCore/DBCommon/interface/DbSession.h"
-//#include "CondCore/DBCommon/interface/DbTransaction.h"
-
 #include "CondCore/CondDB/interface/Session.h"
 #include "CondCore/CondDB/interface/Time.h"
-//#include "CondCore/DBCommon/interface/TagInfo.h"
-//#include "CondCore/DBCommon/interface/LogDBEntry.h"
 
 #include <boost/bind.hpp>
 #include <algorithm>

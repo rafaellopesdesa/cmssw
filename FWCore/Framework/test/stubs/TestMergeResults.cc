@@ -164,18 +164,18 @@ namespace edmtest {
     processHistoryIndex_(0),
     testAlias_(ps.getUntrackedParameter<bool>("testAlias", false)) {
 
-    std::auto_ptr<edmtest::Thing> ap_thing(new edmtest::Thing);
-    edm::Wrapper<edmtest::Thing> w_thing(ap_thing);
+    std::unique_ptr<edmtest::Thing> ap_thing(new edmtest::Thing);
+    edm::Wrapper<edmtest::Thing> w_thing(std::move(ap_thing));
     assert(!w_thing.isMergeable());
     assert(!w_thing.hasIsProductEqual());
 
-    std::auto_ptr<edmtest::ThingWithMerge> ap_thingwithmerge(new edmtest::ThingWithMerge);
-    edm::Wrapper<edmtest::ThingWithMerge> w_thingWithMerge(ap_thingwithmerge);
+    std::unique_ptr<edmtest::ThingWithMerge> ap_thingwithmerge(new edmtest::ThingWithMerge);
+    edm::Wrapper<edmtest::ThingWithMerge> w_thingWithMerge(std::move(ap_thingwithmerge));
     assert(w_thingWithMerge.isMergeable());
     assert(!w_thingWithMerge.hasIsProductEqual());
 
-    std::auto_ptr<edmtest::ThingWithIsEqual> ap_thingwithisequal(new edmtest::ThingWithIsEqual);
-    edm::Wrapper<edmtest::ThingWithIsEqual> w_thingWithIsEqual(ap_thingwithisequal);
+    std::unique_ptr<edmtest::ThingWithIsEqual> ap_thingwithisequal(new edmtest::ThingWithIsEqual);
+    edm::Wrapper<edmtest::ThingWithIsEqual> w_thingWithIsEqual(std::move(ap_thingwithisequal));
     assert(!w_thingWithIsEqual.isMergeable());
     assert(w_thingWithIsEqual.hasIsProductEqual());
     
@@ -304,7 +304,7 @@ namespace edmtest {
       edm::InputTag tag("thingWithMergeProducer", "event", "PROD");
       e.getByLabel(tag, h_thing);
       std::string expectedParent = expectedParents_[parentIndex_];
-      edm::BranchID actualParentBranchID = h_thing.provenance()->parentage().parents()[0];
+      edm::BranchID actualParentBranchID = h_thing.provenance()->productProvenance()->parentage().parents()[0];
 
       // There ought to be a get that uses the BranchID as an argument, but
       // there is not at the moment so we get the Provenance first and use that

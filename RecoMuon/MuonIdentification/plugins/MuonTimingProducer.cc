@@ -21,7 +21,7 @@
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDProducer.h"
+//#include "FWCore/Framework/interface/EDProducer.h"
 
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -64,17 +64,6 @@ MuonTimingProducer::~MuonTimingProducer()
 // member functions
 //
 
-// ------------ method called once each job just before starting event loop  ------------
-void 
-MuonTimingProducer::beginJob()
-{
-}
-
-// ------------ method called once each job just after ending the event loop  ------------
-void 
-MuonTimingProducer::endJob() {
-}
-
 // ------------ method called to produce the data  ------------
 void
 MuonTimingProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) {
@@ -99,11 +88,12 @@ MuonTimingProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) {
 
     reco::MuonTimeExtra dtTime;
     reco::MuonTimeExtra cscTime;
+    reco::MuonTime rpcTime;
     reco::MuonTimeExtra combinedTime;
 
     reco::MuonRef muonr(muons,i);
     
-    theTimingFiller_->fillTiming(*muonr, dtTime, cscTime, combinedTime, iEvent, iSetup);
+    theTimingFiller_->fillTiming(*muonr, dtTime, cscTime, rpcTime, combinedTime, iEvent, iSetup);
     
     dtTimeColl[i] = dtTime;
     cscTimeColl[i] = cscTime;

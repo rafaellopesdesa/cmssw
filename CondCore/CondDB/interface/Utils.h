@@ -8,6 +8,11 @@
 #include <algorithm>
 #include <iostream>
 #include <tuple>
+#include <fstream>
+#include <unistd.h>
+#include <limits.h>
+//
+#include <boost/regex.hpp>
 
 namespace cond {
 
@@ -26,6 +31,53 @@ namespace cond {
       return ret;
     }
 
+    inline std::string currentCMSSWVersion(){
+      std::string version("");
+      const char* envVersion = ::getenv( "CMSSW_VERSION" );
+      if(envVersion){
+        version += envVersion;
+      }
+      return version;
+    }
+
+    inline std::string currentArchitecture(){
+      std::string arch("");
+      const char* archEnv = ::getenv( "SCRAM_ARCH" );
+      if(archEnv){
+        arch += archEnv;
+      }
+      return arch;
+    }
+
+    inline std::string getUserName(){
+      char username[LOGIN_NAME_MAX];
+      int retcode = getlogin_r(username,LOGIN_NAME_MAX);
+      if( retcode ) return "";
+      return std::string(username);
+    }
+
+    inline std::string getHostName(){
+      char hostname[HOST_NAME_MAX];
+      int retcode = gethostname(hostname,HOST_NAME_MAX);
+      if( retcode ) return "";
+      return std::string(hostname);
+    }
+
+    inline std::string getCommand(){
+      std::string commName("");
+      try{
+	std::ifstream comm("/proc/self/cmdline");
+	std::getline(comm,commName);
+        size_t ind = commName.find('\0');
+        while( ind != std::string::npos ){
+	  commName.replace(ind,1,1,' ');
+	  ind = commName.find('\0');
+	}
+      } catch ( std::ifstream::failure ){
+	commName = "unknown";
+      }
+      return commName;
+    }
   }
 
   namespace persistency {
@@ -59,6 +111,61 @@ namespace cond {
       } else throwException( "Technology "+protocol+" is not known.","parseConnectionString" );
 	
       return std::make_tuple( protocol, serviceName, databaseName );
+    }
+
+    inline std::string convertoToOracleConnection(const std::string & input){
+
+      // leave the connection string unmodified for sqlite
+      if( input.find("sqlite") == 0 || input.find("oracle") == 0) return input;
+
+      //static const boost::regex trivial("oracle://(cms_orcon_adg|cms_orcoff_prep)/([_[:alnum:]]+?)");
+      static const boost::regex short_frontier("frontier://([[:alnum:]]+?)/([_[:alnum:]]+?)");
+      static const boost::regex long_frontier("frontier://((\\([-[:alnum:]]+?=[^\\)]+?\\))+)/([_[:alnum:]]+?)");
+      static const boost::regex long_frontier_serverurl("\\(serverurl=[^\\)]+?/([[:alnum:]]+?)\\)");
+
+      static const std::map<std::string, std::string> frontierMap = {
+	{"PromptProd", "cms_orcon_adg"},
+	{"FrontierProd", "cms_orcon_adg"},
+	{"FrontierArc", "cms_orcon_adg"},
+	{"FrontierOnProd", "cms_orcon_adg"},
+	{"FrontierPrep", "cms_orcoff_prep"},
+      };
+
+      boost::smatch matches;
+
+      static const std::string technology("oracle://");
+      std::string service("");
+      std::string account("");
+
+      bool match = false;
+      if (boost::regex_match(input, matches, short_frontier)){
+	service = matches[1];
+	account = matches[2];
+	match = true;
+      }
+      
+      if (boost::regex_match(input, matches, long_frontier)) {
+	std::string frontier_config(matches[1]);
+	boost::smatch matches2;
+	if (not boost::regex_search(frontier_config, matches2, long_frontier_serverurl))
+	  throwException("No serverurl in matched long frontier","convertoToOracleConnection");
+	service = matches2[1];
+	account = matches[3];
+	match = true;
+      }
+
+      if( !match ) throwException("Connection string "+input+" can't be converted to oracle connection.","convertoToOracleConnection");
+
+      if( service == "FrontierArc" ){
+	size_t len = account.size()-5;
+	account = account.substr(0,len);
+      }
+
+      auto it = frontierMap.find( service );
+      if( it == frontierMap.end() ) throwException("Connection string can't be converted.","convertoToOracleConnection");
+      service = it->second; 
+
+      return technology+service+"/"+account;
     }
     
   }

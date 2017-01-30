@@ -5,6 +5,7 @@
 #include "FWCore/Utilities/interface/transform.h"
 #include "boost/foreach.hpp"
 
+
 SiStripClusterizer::
 SiStripClusterizer(const edm::ParameterSet& conf) 
   : inputTags( conf.getParameter<std::vector<edm::InputTag> >("DigiProducersList") ),
@@ -32,6 +33,7 @@ produce(edm::Event& event, const edm::EventSetup& es)  {
 
   LogDebug("Output") << output->dataSize() << " clusters from " 
 		     << output->size()     << " modules";
+  output->shrink_to_fit();
   event.put(output);
 }
 

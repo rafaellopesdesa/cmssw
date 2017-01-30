@@ -29,13 +29,14 @@ void
 GsfTrackProducerBase::putInEvt(edm::Event& evt,
 			       const Propagator* prop,
 			       const MeasurementTracker* measTk,
-			       std::auto_ptr<TrackingRecHitCollection>& selHits,
-			       std::auto_ptr<reco::GsfTrackCollection>& selTracks,
-			       std::auto_ptr<reco::TrackExtraCollection>& selTrackExtras,
-			       std::auto_ptr<reco::GsfTrackExtraCollection>& selGsfTrackExtras,
-			       std::auto_ptr<std::vector<Trajectory> >&   selTrajectories,
-			       AlgoProductCollection& algoResults, TransientTrackingRecHitBuilder const * hitBuilder,
-			       const reco::BeamSpot& bs)
+			       std::unique_ptr<TrackingRecHitCollection>& selHits,
+			       std::unique_ptr<reco::GsfTrackCollection>& selTracks,
+			       std::unique_ptr<reco::TrackExtraCollection>& selTrackExtras,
+			       std::unique_ptr<reco::GsfTrackExtraCollection>& selGsfTrackExtras,
+			       std::unique_ptr<std::vector<Trajectory> >&   selTrajectories,
+			       AlgoProductCollection& algoResults,
+			       TransientTrackingRecHitBuilder const * hitBuilder,
+			       const reco::BeamSpot& bs, const TrackerTopology *ttopo)
 {
 
   TrackingRecHitRefProd rHits = evt.getRefBeforePut<TrackingRecHitCollection>();
@@ -52,15 +53,15 @@ GsfTrackProducerBase::putInEvt(edm::Event& evt,
 
   TSCBLBuilderNoMaterial tscblBuilder;
   
-  for(AlgoProductCollection::iterator i=algoResults.begin(); i!=algoResults.end();i++){
-    Trajectory * theTraj = (*i).first;
+  for(auto & i : algoResults){
+    Trajectory * theTraj = i.trajectory;
     if(trajectoryInEvent_) {
       selTrajectories->push_back(*theTraj);
       iTjRef++;
     }
 
-    reco::GsfTrack * theTrack = (*i).second.first;
-    PropagationDirection seedDir = (*i).second.second;  
+    reco::GsfTrack * theTrack = i.track;
+    PropagationDirection seedDir = i.pDir;  
     
     LogDebug("TrackProducer") << "In GsfTrackProducerBase::putInEvt - seedDir=" << seedDir;
 
@@ -108,8 +109,8 @@ GsfTrackProducerBase::putInEvt(edm::Event& evt,
       {
         edm::Handle<MeasurementTrackerEvent> mte;
         evt.getByToken(mteSrc_, mte);
-	NavigationSetter setter( *theSchool );
-	setSecondHitPattern(theTraj,track,prop,&*mte);
+	// NavigationSetter setter( *theSchool );
+	setSecondHitPattern(theTraj,track,prop,&*mte, ttopo);
       }
     //==============================================================
     
@@ -128,38 +129,39 @@ GsfTrackProducerBase::putInEvt(edm::Event& evt,
     assert(ih==hidx);
     t2t(*theTraj,*selHits,useSplitting);
     auto ie = selHits->size();
-    size_t il = 0;
+    unsigned int nHitsAdded = 0;
     for (;ih<ie; ++ih) {
       auto const & hit = (*selHits)[ih];
-      track.setHitPattern( hit, il ++ );
-      tx.add( TrackingRecHitRef( rHits, hidx ++ ) );
+      track.appendHitPattern(hit, *ttopo);
+      ++nHitsAdded;
     }
-
+    tx.setHits(rHits, hidx, nHitsAdded);
+    hidx += nHitsAdded;
 
     /*
     TrajectoryFitter::RecHitContainer transHits; theTraj->recHitsV(transHits,useSplitting);
     // ---  NOTA BENE: the convention is to sort hits and measurements "along the momentum".
     // This is consistent with innermost and outermost labels only for tracks from LHC collisions
     if (theTraj->direction() == alongMomentum) {
-      for( TrajectoryFitter::RecHitContainer::const_iterator j = transHits.begin();
-	   j != transHits.end(); j ++ ) {
-	if ((**j).hit()!=0){
-	  TrackingRecHit * hit = (**j).hit()->clone();
-	  track.setHitPattern( * hit, ih ++ );
-	  selHits->push_back( hit );
-	  tx.add( TrackingRecHitRef( rHits, hidx ++ ) );
-	}
-      }
+        for(TrajectoryFitter::RecHitContainer::const_iterator j = transHits.begin(); 
+                j != transHits.end(); j++) {
+            if ((**j).hit() != 0){
+                TrackingRecHit *hit = (**j).hit()->clone();
+                track.appendHitPattern(*hit, *ttopo);
+                selHits->push_back(hit);
+                tx.add(TrackingRecHitRef(rHits, hidx++));
+            }
+        }
     }else{
-      for( TrajectoryFitter::RecHitContainer::const_iterator j = transHits.end()-1;
-	   j != transHits.begin()-1; --j ) {
-	if ((**j).hit()!=0){
-	  TrackingRecHit * hit = (**j).hit()->clone();
-	  track.setHitPattern( * hit, ih ++ );
-	  selHits->push_back( hit );
-	tx.add( TrackingRecHitRef( rHits, hidx ++ ) );
-	}
-      }
+        for(TrajectoryFitter::RecHitContainer::const_iterator j = transHits.end() - 1;
+                j != transHits.begin() - 1; --j) {
+            if ((**j).hit() != 0){
+                TrackingRecHit *hit = (**j).hit()->clone();
+                track.appendHitPattern(*hit, *ttopo);
+                selHits->push_back(hit);
+                tx.add(TrackingRecHitRef(rHits, hidx++));
+            }
+        }
     }
     */
     // ----
@@ -242,16 +244,16 @@ GsfTrackProducerBase::putInEvt(edm::Event& evt,
   LogTrace("TrackingRegressionTest") << "=================================================";
   
 
-  rTracks_ = evt.put( selTracks );
-  evt.put( selTrackExtras );
-  evt.put( selGsfTrackExtras );
-  evt.put( selHits );
+  rTracks_ = evt.put(std::move(selTracks) );
+  evt.put(std::move(selTrackExtras) );
+  evt.put(std::move(selGsfTrackExtras) );
+  evt.put(std::move(selHits) );
 
   if(trajectoryInEvent_) {
-    edm::OrphanHandle<std::vector<Trajectory> > rTrajs = evt.put(selTrajectories);
+    edm::OrphanHandle<std::vector<Trajectory> > rTrajs = evt.put(std::move(selTrajectories));
 
     // Now Create traj<->tracks association map
-    std::auto_ptr<TrajGsfTrackAssociationCollection> trajTrackMap( new TrajGsfTrackAssociationCollection() );
+    std::unique_ptr<TrajGsfTrackAssociationCollection> trajTrackMap( new TrajGsfTrackAssociationCollection(rTrajs, rTracks_) );
     for ( std::map<unsigned int, unsigned int>::iterator i = tjTkMap.begin(); 
 	  i != tjTkMap.end(); i++ ) {
       edm::Ref<std::vector<Trajectory> > trajRef( rTrajs, (*i).first );
@@ -259,7 +261,7 @@ GsfTrackProducerBase::putInEvt(edm::Event& evt,
       trajTrackMap->insert( edm::Ref<std::vector<Trajectory> >( rTrajs, (*i).first ),
 			    edm::Ref<reco::GsfTrackCollection>( rTracks_, (*i).second ) );
     }
-    evt.put( trajTrackMap );
+    evt.put( std::move(trajTrackMap) );
   }
 }
 

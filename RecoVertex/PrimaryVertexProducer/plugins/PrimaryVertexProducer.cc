@@ -44,11 +44,9 @@ PrimaryVertexProducer::PrimaryVertexProducer(const edm::ParameterSet& conf)
     theTrackClusterizer = new DAClusterizerInZ(conf.getParameter<edm::ParameterSet>("TkClusParameters").getParameter<edm::ParameterSet>("TkDAClusParameters"));
   }
   // provide the vectorized version of the clusterizer, if supported by the build
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
    else if(clusteringAlgorithm == "DA_vect") {
     theTrackClusterizer = new DAClusterizerInZ_vect(conf.getParameter<edm::ParameterSet>("TkClusParameters").getParameter<edm::ParameterSet>("TkDAClusParameters"));
   }
-#endif
 
 
   else{
@@ -155,11 +153,11 @@ PrimaryVertexProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup
 
 
   // select tracks
-  std::vector<reco::TransientTrack> seltks = theTrackFilter->select( t_tks );
+  std::vector<reco::TransientTrack> && seltks = theTrackFilter->select( t_tks );
 
 
   // clusterize tracks in Z
-  std::vector< std::vector<reco::TransientTrack> > clusters =  theTrackClusterizer->clusterize(seltks);
+  std::vector< std::vector<reco::TransientTrack> > && clusters =  theTrackClusterizer->clusterize(seltks);
   if (fVerbose){std::cout <<  " clustering returned  "<< clusters.size() << " clusters  from " << seltks.size() << " selected tracks" <<std::endl;}
 
 
@@ -168,7 +166,7 @@ PrimaryVertexProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup
 
 
     std::auto_ptr<reco::VertexCollection> result(new reco::VertexCollection);
-    reco::VertexCollection vColl;
+    reco::VertexCollection & vColl = (*result);
 
 
     std::vector<TransientVertex> pvs;
@@ -204,8 +202,11 @@ PrimaryVertexProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup
     }
 
 
+    if (clusters.size()>2 && clusters.size() > 2*pvs.size()) 
+      edm::LogWarning("PrimaryVertexProducer") << "more than half of candidate vertices lost " << pvs.size()  << ' ' << clusters.size();
 
-    
+    if (pvs.empty() && seltks.size()>5) 
+       edm::LogWarning("PrimaryVertexProducer") << "no vertex found with " << seltks.size() << " tracks and " << clusters.size() <<" vertex-candidates";    
 
     // sort vertices by pt**2  vertex (aka signal vertex tagging)
     if(pvs.size()>1){
@@ -262,8 +263,6 @@ PrimaryVertexProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup
       }
     }
 
-  
-    *result = vColl;
     iEvent.put(result, algorithm->label); 
   }
   

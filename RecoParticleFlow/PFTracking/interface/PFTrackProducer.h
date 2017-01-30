@@ -1,7 +1,7 @@
 #ifndef PFTrackProducer_H
 #define PFTrackProducer_H
 
-#include "FWCore/Framework/interface/EDProducer.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -12,6 +12,8 @@
 #include "DataFormats/MuonReco/interface/MuonFwd.h"
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
 
+#include <memory>
+#include <vector>
 
 /// \brief Abstract
 /*!
@@ -20,18 +22,16 @@
   PFTrackTransformer transforms all the tracks in the PFRecTracks.
   NOTE the PFRecTrack collection is transient.  
 */
+class Trajectory;
 
 
 class PFTrackTransformer;
-class PFTrackProducer : public edm::EDProducer {
+class PFTrackProducer : public edm::stream::EDProducer<> {
 public:
   
   ///Constructor
   explicit PFTrackProducer(const edm::ParameterSet&);
-  
-  ///Destructor
-  ~PFTrackProducer();
-  
+    
 private:
   virtual void beginRun(const edm::Run&,const edm::EventSetup&) override;
   virtual void endRun(const edm::Run&,const edm::EventSetup&) override;
@@ -40,8 +40,9 @@ private:
   virtual void produce(edm::Event&, const edm::EventSetup&) override;
   
   ///PFTrackTransformer
-  PFTrackTransformer *pfTransformer_; 
+  std::unique_ptr<PFTrackTransformer> pfTransformer_; 
   std::vector<edm::EDGetTokenT<reco::TrackCollection> > tracksContainers_;
+  std::vector<edm::EDGetTokenT<std::vector<Trajectory>>> trajContainers_;
   edm::EDGetTokenT<reco::GsfTrackCollection> gsfTrackLabel_;  
   edm::EDGetTokenT<reco::MuonCollection> muonColl_;
   edm::EDGetTokenT<reco::VertexCollection> vtx_h;

@@ -15,7 +15,6 @@
 #include "DataFormats/BeamSpot/interface/BeamSpot.h"
 #include "DataFormats/FEDRawData/interface/FEDNumbering.h"
 #include "DataFormats/Candidate/interface/LeafCandidate.h"
-#include "DataFormats/Math/interface/normalizedPhi.h"
 #include "FWCore/Framework/interface/ConsumesCollector.h"
 
 #include <algorithm>
@@ -97,7 +96,7 @@ void PixelUnpackingRegions::initialize(const edm::EventSetup& es)
   {
     edm::ESTransientHandle<SiPixelFedCablingMap> cablingMap;
     es.get<SiPixelFedCablingMapRcd>().get( cablingMap );
-    cabling_.reset((SiPixelFedCabling*)cablingMap->cablingTree());
+    cabling_ = cablingMap->cablingTree();
 
     edm::ESHandle<TrackerGeometry> geom;
     // get the TrackerGeom
@@ -111,7 +110,7 @@ void PixelUnpackingRegions::initialize(const edm::EventSetup& es)
     phiFPIXp_.reserve(512);
     phiFPIXm_.reserve(512);
 
-    std::vector<GeomDet*>::const_iterator it = geom->dets().begin();
+    auto it = geom->dets().begin();
     for ( ; it != geom->dets().end(); ++it)
     {
       int subdet = (*it)->geographicalId().subdetId();
@@ -124,7 +123,7 @@ void PixelUnpackingRegions::initialize(const edm::EventSetup& es)
       m.y = (*it)->position().y();
       m.z = (*it)->position().z();
 
-      m.phi = normalizedPhi( (*it)->position().phi() ); // ensure [-pi,+pi]
+      m.phi = (*it)->position().phi();
 
       m.id = (*it)->geographicalId().rawId();
       const std::vector<sipixelobjects::CablingPathToDetUnit> path2det = cabling_->pathToDetUnit(m.id);
@@ -155,7 +154,7 @@ void PixelUnpackingRegions::addRegion(Region &r)
 {
   ++nreg_;
 
-  float phi = normalizedPhi(r.v.phi());  // ensure [-pi,+pi]
+  float phi = r.v.phi();
 
   Module lo(phi - r.dPhi);
   Module hi(phi + r.dPhi);

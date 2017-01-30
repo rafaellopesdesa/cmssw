@@ -15,13 +15,13 @@
 #include<memory>
 
 class TrackingRegion;
-class SeedingLayerSetsHits;
+class dso_hidden SeedingLayerSetsHits;
 // class MultiHitGeneratorFromPairAndLayers;
 
 namespace edm { class Event; }
 namespace edm { class EventSetup; }
 
-class CombinedMultiHitGenerator final : public MultiHitGenerator {
+class dso_hidden CombinedMultiHitGenerator final : public MultiHitGenerator {
 public:
   typedef LayerHitMapCache  LayerCacheType;
 
@@ -35,9 +35,10 @@ public:
   virtual void hitSets( const TrackingRegion& reg, OrderedMultiHits & result,
       const edm::Event & ev,  const edm::EventSetup& es);
 
-   virtual void clear() override {
-      theGenerator->clear(); 
-   }
+  virtual void clear() override {
+    MultiHitGenerator::clear();
+    theGenerator->clear();
+  }
 
 private:
   edm::EDGetTokenT<SeedingLayerSetsHits> theSeedingLayerToken;

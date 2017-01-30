@@ -11,6 +11,7 @@
 //
 
 // system include files
+#include <cassert>
 
 // user include files
 #include "FWCore/Framework/interface/stream/ProducingModuleAdaptorBase.h"
@@ -105,10 +106,29 @@ namespace edm {
 
     template< typename T>
     void
-    ProducingModuleAdaptorBase<T>::modulesDependentUpon(const std::string& iProcessName,
-                                                        std::vector<const char*>& oModuleLabels) const {
+    ProducingModuleAdaptorBase<T>::modulesDependentUpon(std::string const& iProcessName,
+                                                        std::string const& iModuleLabel,
+                                                        bool iPrint,
+                                                        std::vector<char const*>& oModuleLabels) const {
       assert(not m_streamModules.empty());
-      return m_streamModules[0]->modulesDependentUpon(iProcessName, oModuleLabels);
+      return m_streamModules[0]->modulesDependentUpon(iProcessName, iModuleLabel, iPrint, oModuleLabels);
+    }
+
+    template< typename T>
+    void
+    ProducingModuleAdaptorBase<T>::modulesWhoseProductsAreConsumed(std::vector<ModuleDescription const*>& modules,
+                                                                   ProductRegistry const& preg,
+                                                                   std::map<std::string, ModuleDescription const*> const& labelsToDesc,
+                                                                   std::string const& processName) const {
+      assert(not m_streamModules.empty());
+      return m_streamModules[0]->modulesWhoseProductsAreConsumed(modules, preg, labelsToDesc, processName);
+    }
+
+    template< typename T>
+    std::vector<edm::ConsumesInfo>
+    ProducingModuleAdaptorBase<T>::consumesInfo() const {
+      assert(not m_streamModules.empty());
+      return m_streamModules[0]->consumesInfo();
     }
 
     template< typename T>
@@ -140,7 +160,7 @@ namespace edm {
     template< typename T>
     void
     ProducingModuleAdaptorBase<T>::doStreamBeginRun(StreamID id,
-                                                    RunPrincipal& rp,
+                                                    RunPrincipal const& rp,
                                                     EventSetup const& c,
                                                     ModuleCallingContext const* mcc)
     {
@@ -155,7 +175,7 @@ namespace edm {
     template< typename T>
     void
     ProducingModuleAdaptorBase<T>::doStreamEndRun(StreamID id,
-                                                  RunPrincipal& rp,
+                                                  RunPrincipal const& rp,
                                                   EventSetup const& c,
                                                   ModuleCallingContext const* mcc)
     {
@@ -169,7 +189,7 @@ namespace edm {
     template< typename T>
     void
     ProducingModuleAdaptorBase<T>::doStreamBeginLuminosityBlock(StreamID id,
-                                                                LuminosityBlockPrincipal& lbp,
+                                                                LuminosityBlockPrincipal const& lbp,
                                                                 EventSetup const& c,
                                                                 ModuleCallingContext const* mcc) {
       auto mod = m_streamModules[id];
@@ -183,7 +203,7 @@ namespace edm {
     template< typename T>
     void
     ProducingModuleAdaptorBase<T>::doStreamEndLuminosityBlock(StreamID id,
-                                                              LuminosityBlockPrincipal& lbp,
+                                                              LuminosityBlockPrincipal const& lbp,
                                                               EventSetup const& c,
                                                               ModuleCallingContext const* mcc)
     {
@@ -196,15 +216,32 @@ namespace edm {
     
     template< typename T>
     void
-    ProducingModuleAdaptorBase<T>::doRespondToOpenInputFile(FileBlock const& fb){}
+    ProducingModuleAdaptorBase<T>::doRespondToOpenInputFile(FileBlock const&){}
     template< typename T>
     void
-    ProducingModuleAdaptorBase<T>::doRespondToCloseInputFile(FileBlock const& fb){}
+    ProducingModuleAdaptorBase<T>::doRespondToCloseInputFile(FileBlock const&){}
     template< typename T>
     void
-    ProducingModuleAdaptorBase<T>::doPreForkReleaseResources(){}
+    ProducingModuleAdaptorBase<T>::doPreForkReleaseResources(){
+      for(auto m: m_streamModules) {
+        m->preForkReleaseResources();
+      }
+    }
     template< typename T>
     void
-    ProducingModuleAdaptorBase<T>::doPostForkReacquireResources(unsigned int iChildIndex, unsigned int iNumberOfChildren){}
+    ProducingModuleAdaptorBase<T>::doPostForkReacquireResources(unsigned int iChildIndex, unsigned int iNumberOfChildren){
+      for(auto m: m_streamModules) {
+        m->postForkReacquireResources(iChildIndex,iNumberOfChildren);
+      }
+    }
+
+    template< typename T>
+    void
+    ProducingModuleAdaptorBase<T>::doRegisterThinnedAssociations(ProductRegistry const& registry,
+                                                                 ThinnedAssociationsHelper& helper) {
+      assert(not m_streamModules.empty());
+      auto mod = m_streamModules[0];
+      mod->registerThinnedAssociations(registry, helper);
+    }
   }
 }

@@ -2,10 +2,8 @@
 #include "CalibTracker/SiStripCommon/interface/ShallowTools.h"
 
 #include "FWCore/Framework/interface/Event.h"
-#include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"
-#include "SimTracker/Records/interface/TrackAssociatorRecord.h"
-#include "SimTracker/TrackAssociation/interface/TrackAssociatorByChi2.h"
-#include "SimTracker/TrackAssociation/interface/TrackAssociatorByHits.h"
+#include "FWCore/Framework/interface/ESHandle.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "DataFormats/RecoCandidate/interface/TrackAssociation.h"
 
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
@@ -13,9 +11,9 @@
 ShallowSimTracksProducer::ShallowSimTracksProducer(const edm::ParameterSet& conf) 
   : Prefix( conf.getParameter<std::string>("Prefix") ),
     Suffix( conf.getParameter<std::string>("Suffix") ),
-    trackingParticles_tag( conf.getParameter<edm::InputTag>("TrackingParticles")),
-    associator_tag( conf.getParameter<edm::ESInputTag>("Associator")),
-    tracks_tag( conf.getParameter<edm::InputTag>("Tracks"))
+    trackingParticles_token_(consumes<TrackingParticleCollection>(conf.getParameter<edm::InputTag>("TrackingParticles"))),
+    associator_token_( consumes<reco::TrackToTrackingParticleAssociator>(conf.getParameter<edm::InputTag>("Associator"))),
+    tracks_token_(consumes<edm::View<reco::Track> >(conf.getParameter<edm::InputTag>("Tracks")))
 {
   produces <std::vector<unsigned> >     ( Prefix + "multi"      + Suffix );
   produces <std::vector<int> >          ( Prefix + "type"      + Suffix );
@@ -35,9 +33,9 @@ ShallowSimTracksProducer::ShallowSimTracksProducer(const edm::ParameterSet& conf
 void ShallowSimTracksProducer::
 produce(edm::Event& event, const edm::EventSetup& setup) {
 
-  edm::Handle<edm::View<reco::Track> >                tracks ;   event.getByLabel( tracks_tag, tracks);
-  edm::Handle<TrackingParticleCollection>  trackingParticles ;   event.getByLabel( trackingParticles_tag, trackingParticles );  
-  edm::ESHandle<TrackAssociatorBase>              associator ;   setup.get<TrackAssociatorRecord>().get( associator_tag, associator);
+  edm::Handle<edm::View<reco::Track> >                     tracks ;   event.getByToken(tracks_token_, tracks);
+  edm::Handle<TrackingParticleCollection>       trackingParticles ;   event.getByToken(trackingParticles_token_, trackingParticles );  
+  edm::Handle<reco::TrackToTrackingParticleAssociator> associator ;   event.getByToken(associator_token_, associator);
 
   unsigned size = tracks->size();
   std::auto_ptr<std::vector<unsigned> > multi        ( new std::vector<unsigned>(size,    0));
@@ -55,7 +53,7 @@ produce(edm::Event& event, const edm::EventSetup& setup) {
   std::auto_ptr<std::vector<double> >   vy           ( new std::vector<double>  (size,-1000));
   std::auto_ptr<std::vector<double> >   vz           ( new std::vector<double>  (size,-1000));
 
-  reco::RecoToSimCollection associations = associator->associateRecoToSim( tracks, trackingParticles, &event, &setup );
+  reco::RecoToSimCollection associations = associator->associateRecoToSim( tracks, trackingParticles);
   
   for( reco::RecoToSimCollection::const_iterator association = associations.begin(); 
        association != associations.end(); association++) {

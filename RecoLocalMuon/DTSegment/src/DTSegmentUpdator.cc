@@ -54,6 +54,9 @@ DTSegmentUpdator::DTSegmentUpdator(const ParameterSet& config) :
   string theAlgoName = config.getParameter<string>("recAlgo");
   theAlgo = DTRecHitAlgoFactory::get()->create(theAlgoName, 
                                                config.getParameter<ParameterSet>("recAlgoConfig"));
+  intime_cut=20.;
+  if (config.exists("intime_cut"))
+    intime_cut = config.getParameter<double>("intime_cut");
 
   if(debug)
     cout << "[DTSegmentUpdator] Constructor called" << endl;
@@ -71,7 +74,7 @@ void DTSegmentUpdator::setES(const EventSetup& setup){
   theAlgo->setES(setup);
 }
 
-void DTSegmentUpdator::update(DTRecSegment4D* seg, const bool calcT0) const {
+void DTSegmentUpdator::update(DTRecSegment4D* seg, const bool calcT0, bool allow3par) const {
 
   if(debug) cout << "[DTSegmentUpdator] Starting to update the DTRecSegment4D" << endl;
 
@@ -94,19 +97,19 @@ void DTSegmentUpdator::update(DTRecSegment4D* seg, const bool calcT0) const {
   if(hasPhi) updateHits(seg->phiSegment(),pos,dir,step);
   if(hasZed) updateHits(seg->zSegment()  ,pos,dir,step);
 
-  fit(seg);
+  fit(seg,allow3par);
 }
 
-void DTSegmentUpdator::update(DTRecSegment2D* seg) const {
+void DTSegmentUpdator::update(DTRecSegment2D* seg, bool allow3par) const {
   if(debug) cout << "[DTSegmentUpdator] Starting to update the DTRecSegment2D" << endl;
   GlobalPoint pos = (theGeom->idToDet(seg->geographicalId()))->toGlobal(seg->localPosition());
   GlobalVector dir = (theGeom->idToDet(seg->geographicalId()))->toGlobal(seg->localDirection());
 
   updateHits(seg,pos,dir);
-  fit(seg,1);
+  fit(seg,allow3par,0);
 }
 
-void DTSegmentUpdator::fit(DTRecSegment4D* seg)  const {
+void DTSegmentUpdator::fit(DTRecSegment4D* seg, bool allow3par)  const {
   if(debug) cout << "[DTSegmentUpdator] Fit DTRecSegment4D:" << endl;
   // after the update must refit the segments
   
@@ -116,22 +119,19 @@ void DTSegmentUpdator::fit(DTRecSegment4D* seg)  const {
   }
   
   
-  // use the 2-par fit UNLESS the 4D segment only has the Phi projection or is out of time by more than 20ns
-  // - in these cases use the 3-par fit
+  // If both phi and zed projections are present and the phi segment is in time (segment t0<intime_cut) the 3-par fit is blocked and 
+  // segments are fit with the 2-par fit. Setting intime_cut to -1 results in the 3-par fit being used always.
   if(seg->hasPhi()) {
     if(seg->hasZed()) {
-
-      // fit in-time Phi segments with the 2par fit and out-of-time segments with the 3par fit
-      if (fabs(seg->phiSegment()->t0())<40.) {
-        fit(seg->phiSegment(),0);
-        fit(seg->zSegment(),0);      
+      if (fabs(seg->phiSegment()->t0())<intime_cut) {
+        fit(seg->phiSegment(),allow3par,1);
+        fit(seg->zSegment(),allow3par,1);      
       } else {
-        fit(seg->phiSegment(),1);        
-        fit(seg->zSegment(),1);      
+        fit(seg->phiSegment(),allow3par,0);
+        fit(seg->zSegment(),allow3par,0);      
       }
-
-    } else fit(seg->phiSegment(),1);
-  } else fit(seg->zSegment(),1);
+    } else fit(seg->phiSegment(),allow3par,0);
+  } else fit(seg->zSegment(),allow3par,0);
  
   const DTChamber* theChamber = theGeom->chamber(seg->chamberId());
 
@@ -215,7 +215,7 @@ void DTSegmentUpdator::fit(DTRecSegment4D* seg)  const {
 bool DTSegmentUpdator::fit(DTSegmentCand* seg, bool allow3par, const bool fitdebug) const {
 
 //  if (debug && fitdebug) cout << "[DTSegmentUpdator] Fit DTRecSegment2D" << endl;
-  if (!seg->good()) return false;
+//  if (!seg->good()) return false;
 
 //  DTSuperLayerId DTid = (DTSuperLayerId)seg->superLayer()->id();
 //  if (DTid.superlayer()==2)  
@@ -227,15 +227,14 @@ bool DTSegmentUpdator::fit(DTSegmentCand* seg, bool allow3par, const bool fitdeb
   vector <int> lfit;
   vector <double> dist;
   int i=0;
-  
+
   x.reserve(8);
   y.reserve(8);
   sigy.reserve(8);
   lfit.reserve(8);
   dist.reserve(8);
 
-  DTSegmentCand::AssPointCont hits=seg->hits();
-  for (DTSegmentCand::AssPointCont::const_iterator iter=hits.begin(); iter!=hits.end(); ++iter) {
+  for (DTSegmentCand::AssPointCont::const_iterator iter=seg->hits().begin(); iter!=seg->hits().end(); ++iter) {
     LocalPoint pos = (*iter).first->localPosition((*iter).second);
     float xwire = (((*iter).first)->localPosition(DTEnums::Left).x() + ((*iter).first)->localPosition(DTEnums::Right).x()) /2.;
     float distance = pos.x() - xwire;
@@ -261,8 +260,8 @@ bool DTSegmentUpdator::fit(DTSegmentCand* seg, bool allow3par, const bool fitdeb
   fit(x,y,lfit,dist,sigy,pos,dir,cminf,vminf,covMat,chi2,allow3par);
   if (cminf!=0) t0_corr=-cminf/0.00543; // convert drift distance to time
 
-  if (debug && fitdebug) cout << "  DTcand chi2: " << chi2 << endl;
-  if (debug && fitdebug) cout << "  DTcand   t0: " << t0_corr << endl;
+  if (debug && fitdebug)
+    cout << "  DTcand chi2: " << chi2 << "/" << x.size() << "   t0: " << t0_corr << endl;
 
   seg->setPosition(pos);
   seg->setDirection(dir);
@@ -277,7 +276,7 @@ bool DTSegmentUpdator::fit(DTSegmentCand* seg, bool allow3par, const bool fitdeb
   return true;
 }
 
-void DTSegmentUpdator::fit(DTRecSegment2D* seg, bool allow3par) const {
+void DTSegmentUpdator::fit(DTRecSegment2D* seg, bool allow3par, bool block3par) const {
 
   if(debug) cout << "[DTSegmentUpdator] Fit DTRecSegment2D - 3par: " << allow3par << endl;
 
@@ -330,7 +329,7 @@ void DTSegmentUpdator::fit(DTRecSegment2D* seg, bool allow3par) const {
   float vminf=0.;
   double t0_corr = 0.;
 
-  fit(x,y,lfit,dist,sigy,pos,dir,cminf,vminf,covMat,chi2,allow3par);
+  fit(x,y,lfit,dist,sigy,pos,dir,cminf,vminf,covMat,chi2,allow3par,block3par);
   if (cminf!=0) t0_corr=-cminf/0.00543; // convert drift distance to time
 
   if (debug) cout << "   DTSeg2d chi2: " << chi2 << endl;
@@ -357,7 +356,8 @@ void DTSegmentUpdator::fit(const vector<float>& x,
                            float& vminf,
                            AlgebraicSymMatrix& covMatrix,
                            double& chi2,
-                           const bool allow3par)  const {
+                           const bool allow3par,
+                           const bool block3par)  const {
 
   float slope     = 0.;
   float intercept = 0.;
@@ -376,10 +376,10 @@ void DTSegmentUpdator::fit(const vector<float>& x,
 
   // If we have at least one left and one right hit we can try the 3 parameter fit (if it is switched on)
   // FIXME: currently the covariance matrix from the 2-par fit is kept
-  if (leftHits && rightHits && (leftHits+rightHits>3)) {
+  if (leftHits && rightHits && (leftHits+rightHits>3) && allow3par) {
     theFitter->fitNpar(3,x,y,lfit,dist,sigy,slope,intercept,cminf,vminf,chi2,debug);	
     double t0_corr=-cminf/0.00543;
-    if (fabs(t0_corr)<20. && !allow3par) {
+    if (fabs(t0_corr)<intime_cut && block3par) {
       theFitter->fit(x,y,x.size(),sigy,slope,intercept,chi2,covss,covii,covsi);
       cminf=0;
     }
@@ -585,16 +585,16 @@ void DTSegmentUpdator::rejectBadHits(DTChamberRecSegment2D* phiSeg) const {
     }
   }
 	
-  phiSeg->update(updatedRecHits);	
-  
+  phiSeg->update(updatedRecHits);
+
   //final check!
-  if(debug){ 
-  
+  if(debug){
+
     vector<float> x_upd;
     vector<float> y_upd;
- 
+
     cout << " Check the update action: " << endl;
- 
+
     vector<DTRecHit1D> hits_upd = phiSeg->specificRecHits();
     for (vector<DTRecHit1D>::const_iterator hit=hits_upd.begin();
 	 hit!=hits_upd.end(); ++hit) {

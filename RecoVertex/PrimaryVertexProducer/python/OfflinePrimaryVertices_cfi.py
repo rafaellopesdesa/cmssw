@@ -17,7 +17,7 @@ offlinePrimaryVertices = cms.EDProducer("PrimaryVertexProducer",
     ),
 
     TkClusParameters = cms.PSet(
-        algorithm   = cms.string("DA"),
+        algorithm   = cms.string("DA_vect"),
         TkDAClusParameters = cms.PSet(
             coolingFactor = cms.double(0.6),  #  moderate annealing speed
             Tmin = cms.double(4.),            #  end of annealing
@@ -47,7 +47,11 @@ offlinePrimaryVertices = cms.EDProducer("PrimaryVertexProducer",
                                         
 )
 
-# These lines should be uncommented only for the gcc4X builds, with X>=6
-offlinePrimaryVertices.TkClusParameters.algorithm = cms.string("DA_vect" )
-offlinePrimaryVertices.TkClusParameters.TkDAClusParameters.use_vdt = cms.untracked.bool( True )
+# This customization is needed in the trackingLowPU era to be able to
+# produce vertices also in the cases in which the pixel detector is
+# not included in data-taking, like it was the case for "Quiet Beam"
+# collisions on 2016 with run 269207.
 
+from Configuration.StandardSequences.Eras import eras
+eras.trackingLowPU.toModify(offlinePrimaryVertices,
+                            TkFilterParameters = dict(minPixelLayersWithHits = 0))

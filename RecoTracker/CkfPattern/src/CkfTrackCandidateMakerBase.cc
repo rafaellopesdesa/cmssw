@@ -23,6 +23,7 @@
 #include "RecoTracker/CkfPattern/interface/TransientInitialStateEstimator.h"
 #include "RecoTracker/Record/interface/TrackerRecoGeometryRecord.h"
 #include "RecoTracker/Record/interface/CkfComponentsRecord.h"
+#include "RecoTracker/CkfPattern/interface/BaseCkfTrajectoryBuilderFactory.h"
 
 
 #include "RecoTracker/CkfPattern/interface/SeedCleanerByHitPosition.h"
@@ -40,15 +41,28 @@
 #include<algorithm>
 #include<functional>
 
+// #define VI_SORTSEED
+// #define VI_REPRODUCIBLE
+// #define VI_TBB
+
+#include <thread>
+#ifdef VI_TBB
+#include "tbb/parallel_for.h"
+#endif
+
 #include "RecoTracker/CkfPattern/interface/PrintoutHelper.h"
 
 using namespace edm;
 using namespace std;
 
+namespace {
+  BaseCkfTrajectoryBuilder *createBaseCkfTrajectoryBuilder(const edm::ParameterSet& pset, edm::ConsumesCollector& iC) {
+    return BaseCkfTrajectoryBuilderFactory::get()->create(pset.getParameter<std::string>("ComponentType"), pset, iC);
+  }
+}
+
 namespace cms{
   CkfTrackCandidateMakerBase::CkfTrackCandidateMakerBase(edm::ParameterSet const& conf, edm::ConsumesCollector && iC) : 
-
-    conf_(conf),
     theTrackCandidateOutput(true),
     theTrajectoryOutput(false),
     useSplitting(conf.getParameter<bool>("useHitsSplitting")),
@@ -56,11 +70,11 @@ namespace cms{
     cleanTrajectoryAfterInOut(conf.getParameter<bool>("cleanTrajectoryAfterInOut")),
     reverseTrajectories(conf.existsAs<bool>("reverseTrajectories") && conf.getParameter<bool>("reverseTrajectories")),
     theMaxNSeeds(conf.getParameter<unsigned int>("maxNSeeds")),
-    theTrajectoryBuilderName(conf.getParameter<std::string>("TrajectoryBuilder")), 
-    theTrajectoryBuilder(0),
+    theTrajectoryBuilder(createBaseCkfTrajectoryBuilder(conf.getParameter<edm::ParameterSet>("TrajectoryBuilderPSet"), iC)),
     theTrajectoryCleanerName(conf.getParameter<std::string>("TrajectoryCleaner")), 
     theTrajectoryCleaner(0),
-    theInitialState(0),
+    theInitialState(new TransientInitialStateEstimator(conf.getParameter<ParameterSet>("TransientInitialStateEstimatorParameters"))),
+    theMagFieldName(conf.exists("SimpleMagneticField") ? conf.getParameter<std::string>("SimpleMagneticField") : ""),
     theNavigationSchoolName(conf.getParameter<std::string>("NavigationSchool")),
     theNavigationSchool(0),
     theSeedCleaner(0),
@@ -74,16 +88,17 @@ namespace cms{
     //      theSeedLabel = InputTag(conf_.getParameter<std::string>("SeedProducer"),conf_.getParameter<std::string>("SeedLabel"));
     //    else
       theSeedLabel= iC.consumes<edm::View<TrajectorySeed> >(conf.getParameter<edm::InputTag>("src"));
+#ifndef	VI_REPRODUCIBLE
       if ( conf.exists("maxSeedsBeforeCleaning") ) 
 	   maxSeedsBeforeCleaning_=conf.getParameter<unsigned int>("maxSeedsBeforeCleaning");
-
+#endif
       if (conf.existsAs<edm::InputTag>("clustersToSkip")) {
         skipClusters_ = true;
         maskPixels_ = iC.consumes<PixelClusterMask>(conf.getParameter<edm::InputTag>("clustersToSkip"));
         maskStrips_ = iC.consumes<StripClusterMask>(conf.getParameter<edm::InputTag>("clustersToSkip"));
       }
-
-    std::string cleaner = conf_.getParameter<std::string>("RedundantSeedCleaner");
+#ifndef VI_REPRODUCIBLE
+    std::string cleaner = conf.getParameter<std::string>("RedundantSeedCleaner");
     if (cleaner == "SeedCleanerByHitPosition") {
         theSeedCleaner = new SeedCleanerByHitPosition();
     } else if (cleaner == "SeedCleanerBySharedInput") {
@@ -91,24 +106,29 @@ namespace cms{
     } else if (cleaner == "CachingSeedCleanerByHitPosition") {
         theSeedCleaner = new CachingSeedCleanerByHitPosition();
     } else if (cleaner == "CachingSeedCleanerBySharedInput") {
-      int numHitsForSeedCleaner = conf_.existsAs<int>("numHitsForSeedCleaner") ? 
-	conf_.getParameter<int>("numHitsForSeedCleaner") : 4;
-      int onlyPixelHits = conf_.existsAs<bool>("onlyPixelHitsForSeedCleaner") ? 
-	conf_.getParameter<bool>("onlyPixelHitsForSeedCleaner") : false;
+      int numHitsForSeedCleaner = conf.existsAs<int>("numHitsForSeedCleaner") ?
+	conf.getParameter<int>("numHitsForSeedCleaner") : 4;
+      int onlyPixelHits = conf.existsAs<bool>("onlyPixelHitsForSeedCleaner") ?
+	conf.getParameter<bool>("onlyPixelHitsForSeedCleaner") : false;
       theSeedCleaner = new CachingSeedCleanerBySharedInput(numHitsForSeedCleaner,onlyPixelHits);
     } else if (cleaner == "none") {
         theSeedCleaner = 0;
     } else {
         throw cms::Exception("RedundantSeedCleaner not found", cleaner);
     }
+#endif
 
+#ifdef VI_REPRODUCIBLE
+   std::cout << "CkfTrackCandidateMaker in reproducible setting" << std::endl;
+   assert(nullptr==theSeedCleaner);
+   assert(0>=maxSeedsBeforeCleaning_);
+#endif
 
   }
 
   
   // Virtual destructor needed.
   CkfTrackCandidateMakerBase::~CkfTrackCandidateMakerBase() {
-    delete theInitialState;  
     if (theSeedCleaner) delete theSeedCleaner;
   }  
 
@@ -121,21 +141,9 @@ namespace cms{
 
     //services
     es.get<TrackerRecoGeometryRecord>().get( theGeomSearchTracker );
-    std::string mfName = "";
-    if (conf_.exists("SimpleMagneticField"))
-      mfName = conf_.getParameter<std::string>("SimpleMagneticField");
-    es.get<IdealMagneticFieldRecord>().get(mfName,theMagField );
+    es.get<IdealMagneticFieldRecord>().get(theMagFieldName, theMagField );
     //    edm::ESInputTag mfESInputTag(mfName);
     //    es.get<IdealMagneticFieldRecord>().get(mfESInputTag,theMagField );
-
-    if (!theInitialState){
-      // constructor uses the EventSetup, it must be in the setEventSetup were it has a proper value.
-      // get nested parameter set for the TransientInitialStateEstimator
-      ParameterSet tise_params = conf_.getParameter<ParameterSet>("TransientInitialStateEstimatorParameters") ;
-      theInitialState          = new TransientInitialStateEstimator( es,tise_params);
-    }
-
-    theInitialState->setEventSetup( es );
 
     edm::ESHandle<TrajectoryCleaner> trajectoryCleanerH;
     es.get<TrajectoryCleaner::Record>().get(theTrajectoryCleanerName, trajectoryCleanerH);
@@ -144,22 +152,17 @@ namespace cms{
     edm::ESHandle<NavigationSchool> navigationSchoolH;
     es.get<NavigationSchoolRecord>().get(theNavigationSchoolName, navigationSchoolH);
     theNavigationSchool = navigationSchoolH.product();
-
-    // set the TrajectoryBuilder
-    edm::ESHandle<TrajectoryBuilder> theTrajectoryBuilderHandle;
-    es.get<CkfComponentsRecord>().get(theTrajectoryBuilderName,theTrajectoryBuilderHandle);
-    theTrajectoryBuilder = dynamic_cast<const BaseCkfTrajectoryBuilder*>(theTrajectoryBuilderHandle.product());    
-    assert(theTrajectoryBuilder);
+    theTrajectoryBuilder->setNavigationSchool(theNavigationSchool);
   }
 
   // Functions that gets called by framework every event
   void CkfTrackCandidateMakerBase::produceBase(edm::Event& e, const edm::EventSetup& es)
-  { 
+  {
     // getting objects from the EventSetup
     setEventSetup( es ); 
 
     // set the correct navigation
-    NavigationSetter setter( *theNavigationSchool);
+    // NavigationSetter setter( *theNavigationSchool);
     
     // propagator
     edm::ESHandle<Propagator> thePropagator;
@@ -173,7 +176,6 @@ namespace cms{
     edm::Handle<MeasurementTrackerEvent> data;
     e.getByToken(theMTELabel, data);
 
-    std::auto_ptr<BaseCkfTrajectoryBuilder> trajectoryBuilder;
     std::auto_ptr<MeasurementTrackerEvent> dataWithMasks;
     if (skipClusters_) {
         edm::Handle<PixelClusterMask> pixelMask;
@@ -182,12 +184,14 @@ namespace cms{
             e.getByToken(maskStrips_, stripMask);
             dataWithMasks.reset(new MeasurementTrackerEvent(*data, *stripMask, *pixelMask));
         //std::cout << "Trajectory builder " << conf_.getParameter<std::string>("@module_label") << " created with masks, " << std::endl;
-        trajectoryBuilder.reset(theTrajectoryBuilder->clone(&*dataWithMasks));
+        theTrajectoryBuilder->setEvent(e, es, &*dataWithMasks);
     } else {
         //std::cout << "Trajectory builder " << conf_.getParameter<std::string>("@module_label") << " created without masks, " << std::endl;
-        trajectoryBuilder.reset(theTrajectoryBuilder->clone(&*data));
+        theTrajectoryBuilder->setEvent(e, es, &*data);
     }
-    
+    // TISE ES must be set here due to dependence on theTrajectoryBuilder
+    theInitialState->setEventSetup( es, static_cast<TkTransientTrackingRecHitBuilder const *>(theTrajectoryBuilder->hitBuilder())->cloner() );
+
     // Step B: Retrieve seeds
     
     edm::Handle<View<TrajectorySeed> > collseed;
@@ -208,7 +212,7 @@ namespace cms{
     if ((*collseed).size()>0){
 
       unsigned int lastCleanResult=0;
-      vector<Trajectory> rawResult;
+      std::vector<Trajectory> rawResult;
       rawResult.reserve(collseed->size() * 4);
 
       if (theSeedCleaner) theSeedCleaner->init( &rawResult );
@@ -216,25 +220,73 @@ namespace cms{
       // method for debugging
       countSeedsDebugger();
 
-      vector<Trajectory> theTmpTrajectories;
+      // the mutex
+      std::mutex theMutex;
+      using Lock = std::unique_lock<std::mutex>;
 
       // Loop over seeds
-      size_t collseed_size = collseed->size(); 
-      for (size_t j = 0; j < collseed_size; j++){
+      size_t collseed_size = collseed->size();
+
+      unsigned int indeces[collseed_size]; for (auto i=0U; i< collseed_size; ++i) indeces[i]=i;
+
+
+
+
+#ifdef VI_SORTSEED
+      // std::random_shuffle(indeces,indeces+collseed_size);
+       
+       // here only for reference: does not seems to help
+     
+      auto const & seeds = *collseed;
+      
+      
+      float val[collseed_size]; 
+      for (auto i=0U; i< collseed_size; ++i) 
+        {  val[i] =  seeds[i].startingState().pt();};
+      //  { val[i] =  std::abs((*seeds[i].recHits().first).surface()->eta());}
+      
+      /*
+      unsigned long long val[collseed_size];
+      for (auto i=0U; i< collseed_size; ++i) {
+        if (seeds[i].nHits()<2) { val[i]=0; continue;}
+        auto h = seeds[i].recHits().first;  
+        auto const & hit = static_cast<BaseTrackerRecHit const&>(*h);
+        val[i] = hit.firstClusterRef().key(); 
+        if (++h != seeds[i].recHits().second) {
+          auto	const &	hit = static_cast<BaseTrackerRecHit const&>(*h);
+    	  val[i] |= (unsigned long long)(hit.firstClusterRef().key())<<32; 
+        }
+      }
+      */
+      std::sort(indeces,indeces+collseed_size, [&](unsigned int i, unsigned int j){return val[i]<val[j];});
+             
+
+      // std::cout << spt(indeces[0]) << ' ' << spt(indeces[collseed_size-1]) << std::endl;
+#endif      
+      
+      std::atomic<unsigned int> ntseed(0);
+      auto theLoop = [&](size_t ii) {    
+        auto j = indeces[ii];
+
+        ntseed++; 
+
+        // to be moved inside a par section (how with tbb??)
+        std::vector<Trajectory> theTmpTrajectories;
+
 
 	LogDebug("CkfPattern") << "======== Begin to look for trajectories from seed " << j << " ========"<<endl;
 	
+        { Lock lock(theMutex); 
 	// Check if seed hits already used by another track
 	if (theSeedCleaner && !theSeedCleaner->good( &((*collseed)[j])) ) {
           LogDebug("CkfTrackCandidateMakerBase")<<" Seed cleaning kills seed "<<j;
-          continue; 
-        }
+          return;  // from the lambda! 
+        }}
 
 	// Build trajectory from seed outwards
         theTmpTrajectories.clear();
-	auto const & startTraj = trajectoryBuilder->buildTrajectories( (*collseed)[j], theTmpTrajectories, nullptr );
+	auto const & startTraj = theTrajectoryBuilder->buildTrajectories( (*collseed)[j], theTmpTrajectories, nullptr );
 	
-       
 	LogDebug("CkfPattern") << "======== In-out trajectory building found " << theTmpTrajectories.size()
 			            << " trajectories from seed " << j << " ========"<<endl
 			       <<PrintoutHelper::dumpCandidates(theTmpTrajectories);
@@ -253,7 +305,7 @@ namespace cms{
 	// seed and if possible further inwards.
 	
 	if (doSeedingRegionRebuilding) {
-	  trajectoryBuilder->rebuildTrajectories(startTraj,(*collseed)[j],theTmpTrajectories);      
+	  theTrajectoryBuilder->rebuildTrajectories(startTraj,(*collseed)[j],theTmpTrajectories);      
 
   	  LogDebug("CkfPattern") << "======== Out-in trajectory building found " << theTmpTrajectories.size()
   			              << " valid/invalid trajectories from seed " << j << " ========"<<endl
@@ -268,6 +320,7 @@ namespace cms{
                                << j << " ========"<<endl
 			       <<PrintoutHelper::dumpCandidates(theTmpTrajectories);
 
+        { Lock lock(theMutex); 
 	for(vector<Trajectory>::iterator it=theTmpTrajectories.begin();
 	    it!=theTmpTrajectories.end(); it++){
 	  if( it->isValid() ) {
@@ -279,12 +332,13 @@ namespace cms{
             if (theSeedCleaner && rawResult.back().foundHits()>3) theSeedCleaner->add( &rawResult.back() );
             //if (theSeedCleaner ) theSeedCleaner->add( & (*it) );
 	  }
-	}
+	}}
 
         theTmpTrajectories.clear();
         
 	LogDebug("CkfPattern") << "rawResult trajectories found so far = " << rawResult.size();
 
+        { Lock lock(theMutex);
 	if ( maxSeedsBeforeCleaning_ >0 && rawResult.size() > maxSeedsBeforeCleaning_+lastCleanResult) {
           theTrajectoryCleaner->clean(rawResult);
           rawResult.erase(std::remove_if(rawResult.begin()+lastCleanResult,rawResult.end(),
@@ -292,15 +346,34 @@ namespace cms{
 			  rawResult.end());
           lastCleanResult=rawResult.size();
         }
+        }
 
-      }
+      };
       // end of loop over seeds
-      
+
+
+#ifdef VI_TBB
+     tbb::parallel_for(0UL,collseed_size,1UL,theLoop);
+#else
+#ifdef VI_OMP
+#pragma omp parallel for schedule(dynamic,4)
+#endif
+      for (size_t j = 0; j < collseed_size; j++){
+       theLoop(j);
+      }
+#endif
+      assert(ntseed==collseed_size); 
       if (theSeedCleaner) theSeedCleaner->done();
    
-      // std::cout << "VICkfPattern " << "rawResult trajectories found = " << rawResult.size() << std::endl;
+      // std::cout << "VICkfPattern " << "rawResult trajectories found = " << rawResult.size() << " in " << ntseed << " seeds " << collseed_size << std::endl;
 
-   
+#ifdef VI_REPRODUCIBLE
+      // sort trajectory	
+     std::sort(rawResult.begin(), rawResult.end(),[](const Trajectory & a, const Trajectory & b)
+               { return a.seedRef().key() < b.seedRef().key();});
+             //{ return a.chiSquared()*b.ndof() < b.chiSquared()*a.ndof();});
+#endif
+
       // Step E: Clean the results to avoid duplicate tracks
       // Rejected ones just flagged as invalid.
       theTrajectoryCleaner->clean(rawResult);
@@ -315,7 +388,7 @@ namespace cms{
       unsmoothedResult.erase(std::remove_if(unsmoothedResult.begin(),unsmoothedResult.end(),
 					    std::not1(std::mem_fun_ref(&Trajectory::isValid))),
 			     unsmoothedResult.end());
-      
+      unsmoothedResult.shrink_to_fit();
       // If requested, reverse the trajectories creating a new 1-hit seed on the last measurement of the track
       if (reverseTrajectories) {
         for (auto it = unsmoothedResult.begin(), ed = unsmoothedResult.end(); it != ed; ++it) {
@@ -339,8 +412,10 @@ namespace cms{
             Trajectory trajectory(seed, direction);
 	    trajectory.setNLoops(it->nLoops());
             trajectory.setSeedRef(it->seedRef());
+            trajectory.setStopReason(it->stopReason());
             // 4) push states in reversed order
             Trajectory::DataContainer &meas = it->measurements();
+            trajectory.reserve(meas.size());
             for (auto itmeas = meas.rbegin(), endmeas = meas.rend(); itmeas != endmeas; ++itmeas) {
               trajectory.push(std::move(*itmeas));
             }
@@ -370,16 +445,32 @@ namespace cms{
 
          viTotHits+=recHits.size();        
 
-	 LogDebug("CkfPattern") << "getting initial state.";
-	 const bool doBackFit = (!doSeedingRegionRebuilding) & (!reverseTrajectories);
-	 std::pair<TrajectoryStateOnSurface, const GeomDet*> && initState = theInitialState->innerState( *it , doBackFit);
 
-	 // temporary protection againt invalid initial states
-	 if ( !initState.first.isValid() || initState.second == nullptr || edm::isNotFinite(initState.first.globalPosition().x())) {
-	   //cout << "invalid innerState, will not make TrackCandidate" << endl;
-	   continue;
-	 }
-	 
+         LogDebug("CkfPattern") << "getting initial state.";
+         Trajectory trialTrajectory = (*it);
+         std::pair<TrajectoryStateOnSurface, const GeomDet*> initState;
+         bool failed = false;
+
+         do {
+           // Drop last hit if previous backFitter was not successful
+           if(failed) {
+             LogDebug("CkfPattern") << "removing last hit";
+             trialTrajectory.pop();
+             LogDebug("CkfPattern") << "hits remaining " << trialTrajectory.foundHits();
+           }
+
+           // Get inner state
+           const bool doBackFit = (!doSeedingRegionRebuilding) & (!reverseTrajectories);
+           initState = theInitialState->innerState(trialTrajectory, doBackFit);
+
+           // Check if that was successful
+           failed =  (!initState.first.isValid()) || initState.second == nullptr || edm::isNotFinite(initState.first.globalPosition().x());
+         } while(failed && trialTrajectory.foundHits() > 3);
+
+         if(failed) continue;
+
+
+
 	 PTrajectoryStateOnDet state;
 	 if(useSplitting && (initState.second != recHits.front().det()) && recHits.front().det() ){	 
 	   LogDebug("CkfPattern") << "propagating to hit front in case of splitting.";
@@ -391,7 +482,7 @@ namespace cms{
 	 else state = trajectoryStateTransform::persistentState( initState.first,
 							         initState.second->geographicalId().rawId());
 	 LogDebug("CkfPattern") << "pushing a TrackCandidate.";
-	 output->emplace_back(recHits,it->seed(),state,it->seedRef(),it->nLoops());
+	 output->emplace_back(recHits,it->seed(),state,it->seedRef(),it->nLoops(), (uint8_t)it->stopReason());
        }
       }//output trackcandidates
 

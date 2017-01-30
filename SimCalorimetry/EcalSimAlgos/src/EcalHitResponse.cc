@@ -28,7 +28,7 @@ EcalHitResponse::EcalHitResponse( const CaloVSimParameterMap* parameterMap ,
    m_hitFilter       ( 0            ) ,
    m_geometry        ( 0            ) ,
    m_lasercals       ( 0            ) ,
-   m_minBunch        ( -10          ) ,
+   m_minBunch        ( -32          ) ,
    m_maxBunch        (  10          ) ,
    m_phaseShift      ( 1            ) ,
    m_iTime           ( 0            ) ,
@@ -138,6 +138,28 @@ EcalHitResponse::add( const PCaloHit& hit, CLHEP::HepRandomEngine* engine )
     putAnalogSignal( hit, engine ) ;
   }
 }
+
+void 
+EcalHitResponse::add( const CaloSamples& hit ) 
+{
+  const DetId detId ( hit.id() ) ;
+
+  EcalSamples& result ( *findSignal( detId ) ) ;
+
+  const int rsize ( result.size() ) ;
+
+  if(rsize != hit.size()) {
+    throw cms::Exception("EcalDigitization")
+      << "CaloSamples and EcalSamples have different sizes. Type Mismatach";
+  }
+
+  for( int bin ( 0 ) ; bin != rsize ; ++bin )
+    {
+      result[ bin ] += hit[ bin ] ;
+    }
+
+}
+
 
 bool
 EcalHitResponse::withinBunchRange(int bunchCrossing) const

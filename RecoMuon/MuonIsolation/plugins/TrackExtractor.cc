@@ -13,7 +13,7 @@ using namespace muonisolation;
 using reco::isodeposit::Direction;
 
 TrackExtractor::TrackExtractor( const ParameterSet& par, edm::ConsumesCollector && iC ) :
-  theTrackCollectionToken(iC.consumes<View<Track> >(par.getParameter<edm::InputTag>("inputTrackCollection"))),
+  theTrackCollectionToken(iC.consumes<TrackCollection>(par.getParameter<edm::InputTag>("inputTrackCollection"))),
   theDepositLabel(par.getUntrackedParameter<string>("DepositLabel")),
   theDiff_r(par.getParameter<double>("Diff_r")),
   theDiff_z(par.getParameter<double>("Diff_z")),
@@ -45,14 +45,14 @@ reco::IsoDeposit::Veto TrackExtractor::veto(const reco::IsoDeposit::Direction & 
 
 IsoDeposit TrackExtractor::deposit(const Event & event, const EventSetup & eventSetup, const Track & muon) const
 {
-  static std::string metname = "MuonIsolation|TrackExtractor";
+  static const std::string metname = "MuonIsolation|TrackExtractor";
 
   reco::isodeposit::Direction muonDir(muon.eta(), muon.phi());
   IsoDeposit deposit(muonDir );
   deposit.setVeto( veto(muonDir) );
   deposit.addCandEnergy(muon.pt());
 
-  Handle<View<Track> > tracksH;
+  Handle<TrackCollection> tracksH;
   event.getByToken(theTrackCollectionToken, tracksH);
   //  const TrackCollection tracks = *(tracksH.product());
   LogTrace(metname)<<"***** TRACK COLLECTION SIZE: "<<tracksH->size();

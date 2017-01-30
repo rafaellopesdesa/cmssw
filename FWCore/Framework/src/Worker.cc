@@ -17,7 +17,7 @@ public:
         if(a_) a_->postModuleBeginJobSignal_(*md_);
       }
 private:
-      ActivityRegistry* a_;
+      ActivityRegistry* a_; // We do not use propagate_const because the registry itself is mutable.
       ModuleDescription const* md_;
     };
 
@@ -30,7 +30,7 @@ public:
         if(a_) a_->postModuleEndJobSignal_(*md_);
       }
 private:
-      ActivityRegistry* a_;
+      ActivityRegistry* a_; // We do not use propagate_const because the registry itself is mutable.
       ModuleDescription const* md_;
     };
 
@@ -45,7 +45,7 @@ private:
         if(a_) a_->postModuleBeginStreamSignal_(sc_, mcc_);
       }
     private:
-      ActivityRegistry* a_;
+      ActivityRegistry* a_; // We do not use propagate_const because the registry itself is mutable.
       StreamContext const& sc_;
       ModuleCallingContext const& mcc_;
     };
@@ -61,22 +61,15 @@ private:
         if(a_) a_->postModuleEndStreamSignal_(sc_, mcc_);
       }
     private:
-      ActivityRegistry* a_;
+      ActivityRegistry* a_; // We do not use propagate_const because the registry itself is mutable.
       StreamContext const& sc_;
       ModuleCallingContext const& mcc_;
     };
-
-    inline cms::Exception& exceptionContext(ModuleDescription const& iMD,
-                                     cms::Exception& iEx) {
-      iEx << iMD.moduleName() << "/" << iMD.moduleLabel() << "\n";
-      return iEx;
-    }
 
   }
 
   Worker::Worker(ModuleDescription const& iMD, 
 		 ExceptionToActionTable const* iActions) :
-    stopwatch_(),
     timesRun_(),
     timesVisited_(),
     timesPassed_(),
@@ -94,7 +87,7 @@ private:
   Worker::~Worker() {
   }
 
-  void Worker::setActivityRegistry(boost::shared_ptr<ActivityRegistry> areg) {
+  void Worker::setActivityRegistry(std::shared_ptr<ActivityRegistry> areg) {
     actReg_ = areg;
   }
 
@@ -188,16 +181,12 @@ private:
     }
   }
 
-  void Worker::useStopwatch(){
-    stopwatch_.reset(new RunStopwatch::StopwatchPointer::element_type);
-  }
-  
-  void Worker::pathFinished(EventPrincipal& iEvent) {
+  void Worker::pathFinished(EventPrincipal const& iEvent) {
     if(earlyDeleteHelper_) {
       earlyDeleteHelper_->pathFinished(iEvent);
     }
   }
-  void Worker::postDoEvent(EventPrincipal& iEvent) {
+  void Worker::postDoEvent(EventPrincipal const& iEvent) {
     if(earlyDeleteHelper_) {
       earlyDeleteHelper_->moduleRan(iEvent);
     }

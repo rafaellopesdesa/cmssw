@@ -2,7 +2,12 @@ import FWCore.ParameterSet.Config as cms
 import copy
 
 from RecoLocalTracker.SubCollectionProducers.ClusterSelectorTopBottom_cfi import *
-from RecoLocalTracker.Configuration.RecoLocalTracker_Cosmics_cff import *
+from RecoLocalTracker.SiStripRecHitConverter.SiStripRecHitConverter_cfi import *
+from RecoLocalTracker.SiStripRecHitConverter.SiStripRecHitMatcher_cfi import *
+from RecoLocalTracker.SiStripRecHitConverter.StripCPEfromTrackAngle_cfi import *
+from RecoLocalTracker.SiStripZeroSuppression.SiStripZeroSuppression_cfi import *
+from RecoLocalTracker.SiStripClusterizer.SiStripClusterizer_cfi import *
+from RecoLocalTracker.SiPixelRecHits.SiPixelRecHits_cfi import *
 from RecoTracker.SpecialSeedGenerators.CombinatorialSeedGeneratorForCosmicsP5_cff import combinatorialcosmicseedfinderP5, combinatorialcosmicseedingtripletsP5, combinatorialcosmicseedingpairsTOBP5, combinatorialcosmicseedingpairsTECposP5, combinatorialcosmicseedingpairsTECnegP5
 from RecoTracker.SpecialSeedGenerators.SimpleCosmicBONSeeder_cff import simpleCosmicBONSeeds, simpleCosmicBONSeedingLayers
 from RecoTracker.TkSeedGenerator.GlobalCombinedSeeds_cff import globalCombinedSeeds
@@ -103,9 +108,8 @@ ComponentName = cms.string('MeasurementTrackerTop')
 )
 GroupedCkfTrajectoryBuilderP5Top = copy.deepcopy(GroupedCkfTrajectoryBuilderP5)
 GroupedCkfTrajectoryBuilderP5Top.MeasurementTrackerName = cms.string('MeasurementTrackerTop')
-GroupedCkfTrajectoryBuilderP5Top.ComponentName = cms.string('GroupedCkfTrajectoryBuilderP5Top')
 ckfTrackCandidatesP5Top = copy.deepcopy(ckfTrackCandidatesP5)
-ckfTrackCandidatesP5Top.TrajectoryBuilder = 'GroupedCkfTrajectoryBuilderP5Top'
+ckfTrackCandidatesP5Top.TrajectoryBuilderPSet.refToPSet_ = 'GroupedCkfTrajectoryBuilderP5Top'
 ckfTrackCandidatesP5Top.NavigationSchool   = 'CosmicNavigationSchool'
 ckfTrackCandidatesP5Top.src       = 'combinedP5SeedsForCTFTop' #ok for 32X
 #ckfTrackCandidatesP5Top.SeedProducer       = 'combinedP5SeedsForCTFTop' #ok for 22X
@@ -197,9 +201,8 @@ ComponentName = cms.string('MeasurementTrackerBottom')
 )
 GroupedCkfTrajectoryBuilderP5Bottom = copy.deepcopy(GroupedCkfTrajectoryBuilderP5)
 GroupedCkfTrajectoryBuilderP5Bottom.MeasurementTrackerName = cms.string('MeasurementTrackerBottom')
-GroupedCkfTrajectoryBuilderP5Bottom.ComponentName = cms.string('GroupedCkfTrajectoryBuilderP5Bottom')
 ckfTrackCandidatesP5Bottom = copy.deepcopy(ckfTrackCandidatesP5)
-ckfTrackCandidatesP5Bottom.TrajectoryBuilder = 'GroupedCkfTrajectoryBuilderP5Bottom'
+ckfTrackCandidatesP5Bottom.TrajectoryBuilderPSet.refToPSet_ = 'GroupedCkfTrajectoryBuilderP5Bottom'
 ckfTrackCandidatesP5Bottom.NavigationSchool   = 'CosmicNavigationSchool'
 ckfTrackCandidatesP5Bottom.src       = 'combinedP5SeedsForCTFBottom' #ok for 32X
 #ckfTrackCandidatesP5Bottom.SeedProducer       = 'combinedP5SeedsForCTFBottom' #ok for 22X

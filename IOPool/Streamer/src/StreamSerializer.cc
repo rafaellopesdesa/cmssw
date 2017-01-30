@@ -25,7 +25,8 @@
 #include "zlib.h"
 #include <algorithm>
 #include <cstdlib>
-#include <list>
+#include <iostream>
+#include <vector>
 
 namespace edm {
 
@@ -42,11 +43,11 @@ namespace edm {
    * into the specified InitMessage.
    */
 
-  int StreamSerializer::serializeRegistry(SerializeDataBuffer &data_buffer, const BranchIDLists &branchIDLists) {
+  int StreamSerializer::serializeRegistry(SerializeDataBuffer &data_buffer,
+                                          const BranchIDLists &branchIDLists,
+                                          ThinnedAssociationsHelper const& thinnedAssociationsHelper) {
     FDEBUG(6) << "StreamSerializer::serializeRegistry" << std::endl;
     SendJobHeader sd;
-
-    SelectedProducts::const_iterator i(selections_->begin()), e(selections_->end());
 
     FDEBUG(9) << "Product List: " << std::endl;
 
@@ -58,6 +59,7 @@ namespace edm {
     }
     Service<ConstProductRegistry> reg;
     sd.setBranchIDLists(branchIDLists);
+    sd.setThinnedAssociationsHelper(thinnedAssociationsHelper);
     SendJobHeader::ParameterSetMap psetMap;
 
     pset::Registry::instance()->fillMap(psetMap);
@@ -99,7 +101,7 @@ namespace edm {
    data_buffer.curr_space_used_ = data_buffer.curr_event_size_;
    data_buffer.ptr_ = (unsigned char*)data_buffer.rootbuf_.Buffer();
    // calculate the adler32 checksum and fill it into the struct
-   data_buffer.adler32_chksum_ = cms::Adler32((char*)data_buffer.ptr_, data_buffer.curr_space_used_);
+   data_buffer.adler32_chksum_ = cms::Adler32((char*)data_buffer.bufferPointer(), data_buffer.curr_space_used_);
    //std::cout << "Adler32 checksum of init message = " << data_buffer.adler32_chksum_ << std::endl;
    return data_buffer.curr_space_used_;
   }
@@ -135,7 +137,6 @@ namespace edm {
     selectionIDs.push_back(selectorConfig);
     SendEvent se(eventPrincipal.aux(), eventPrincipal.processHistory(), selectionIDs, eventPrincipal.branchListIndexes());
 
-    SelectedProducts::const_iterator i(selections_->begin()),ie(selections_->end());
     // Loop over EDProducts, fill the provenance, and write.
 
     for(SelectedProducts::const_iterator i = selections_->begin(), iEnd = selections_->end(); i != iEnd; ++i) {
@@ -215,7 +216,7 @@ namespace edm {
       }
     }
     // calculate the adler32 checksum and fill it into the struct
-    data_buffer.adler32_chksum_ = cms::Adler32((char*)data_buffer.ptr_, data_buffer.curr_space_used_);
+    data_buffer.adler32_chksum_ = cms::Adler32((char*)data_buffer.bufferPointer(), data_buffer.curr_space_used_);
     //std::cout << "Adler32 checksum of event = " << data_buffer.adler32_chksum_ << std::endl;
 
     return data_buffer.curr_space_used_;

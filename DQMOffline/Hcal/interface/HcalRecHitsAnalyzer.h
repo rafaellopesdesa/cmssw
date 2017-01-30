@@ -56,10 +56,8 @@
 class HcalRecHitsAnalyzer : public DQMEDAnalyzer {
  public:
   HcalRecHitsAnalyzer(edm::ParameterSet const& conf);
-  ~HcalRecHitsAnalyzer();
-  virtual void analyze(edm::Event const& ev, edm::EventSetup const& c);
-  virtual void beginJob() ;
-  virtual void endJob() ;
+
+  virtual void analyze(edm::Event const& ev, edm::EventSetup const& c) override;
   virtual void bookHistograms(DQMStore::IBooker &, edm::Run const &, edm::EventSetup const &) override;
  private:
   
@@ -337,6 +335,10 @@ class HcalRecHitsAnalyzer : public DQMEDAnalyzer {
   MonitorElement* RecHit_StatusWord_HF;
   MonitorElement* RecHit_StatusWord_HF67;
   MonitorElement* RecHit_StatusWord_HO;
+
+  //Status word correlation
+  MonitorElement* RecHit_StatusWordCorr_HB;
+  MonitorElement* RecHit_StatusWordCorr_HE;
 
   //Aux Status word histos
   MonitorElement* RecHit_Aux_StatusWord_HB;

@@ -7,6 +7,10 @@
  *
  */
 
+#include <algorithm>
+#include <memory>
+#include <typeinfo>
+
 #include "HLTrigger/HLTcore/interface/TriggerSummaryProducerAOD.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 
@@ -26,6 +30,8 @@
 #include "DataFormats/METReco/interface/METFwd.h"
 #include "DataFormats/METReco/interface/CaloMET.h"
 #include "DataFormats/METReco/interface/CaloMETFwd.h"
+#include "DataFormats/METReco/interface/PFMET.h"
+#include "DataFormats/METReco/interface/PFMETFwd.h"
 #include "DataFormats/HcalIsolatedTrack/interface/IsolatedPixelTrackCandidate.h"
 
 #include "DataFormats/L1Trigger/interface/L1HFRings.h"
@@ -34,26 +40,27 @@
 #include "DataFormats/L1Trigger/interface/L1MuonParticle.h"
 #include "DataFormats/L1Trigger/interface/L1EtMissParticle.h"
 
+#include "DataFormats/L1Trigger/interface/Muon.h"
+#include "DataFormats/L1Trigger/interface/EGamma.h"
+#include "DataFormats/L1Trigger/interface/Jet.h"
+#include "DataFormats/L1Trigger/interface/Tau.h"
+#include "DataFormats/L1Trigger/interface/EtSum.h"
+
 #include "DataFormats/JetReco/interface/PFJet.h"
 #include "DataFormats/TauReco/interface/PFTau.h"
 
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/Framework/interface/TriggerNamesService.h"
 
-#include <algorithm>
-#include <memory>
-#include <typeinfo>
-
-
 //
 // constructors and destructor
 //
-TriggerSummaryProducerAOD::TriggerSummaryProducerAOD(const edm::ParameterSet& ps) : 
+TriggerSummaryProducerAOD::TriggerSummaryProducerAOD(const edm::ParameterSet& ps, const GlobalInputTags * gt) : 
   pn_(ps.getParameter<std::string>("processName")),
   filterTagsEvent_(pn_!="*"),
-  filterTagsGlobal_(pn_!="*"),
+  filterTagsStream_(pn_!="*"),
   collectionTagsEvent_(pn_!="*"),
-  collectionTagsGlobal_(pn_!="*"),
+  collectionTagsStream_(pn_!="*"),
   toc_(),
   tags_(),
   offset_(),
@@ -71,14 +78,14 @@ TriggerSummaryProducerAOD::TriggerSummaryProducerAOD(const edm::ParameterSet& ps
     }
 
     filterTagsEvent_     =InputTagSet(pn_!="*");
-    filterTagsGlobal_    =InputTagSet(pn_!="*");
+    filterTagsStream_    =InputTagSet(pn_!="*");
     collectionTagsEvent_ =InputTagSet(pn_!="*");
-    collectionTagsGlobal_=InputTagSet(pn_!="*");
+    collectionTagsStream_=InputTagSet(pn_!="*");
   }
   LogDebug("TriggerSummaryProducerAOD") << "Using process name: '" << pn_ <<"'";
 
-  filterTagsGlobal_.clear();
-  collectionTagsGlobal_.clear();
+  filterTagsStream_.clear();
+  collectionTagsStream_.clear();
 
   produces<trigger::TriggerEvent>();
 
@@ -96,8 +103,14 @@ TriggerSummaryProducerAOD::TriggerSummaryProducerAOD(const edm::ParameterSet& ps
   getL1JetParticleCollection_ = edm::GetterOfProducts<l1extra::L1JetParticleCollection>(edm::ProcessMatch(pn_), this);
   getL1EtMissParticleCollection_ = edm::GetterOfProducts<l1extra::L1EtMissParticleCollection>(edm::ProcessMatch(pn_), this);
   getL1HFRingsCollection_ = edm::GetterOfProducts<l1extra::L1HFRingsCollection>(edm::ProcessMatch(pn_), this);
+  getL1TMuonParticleCollection_ = edm::GetterOfProducts<l1t::MuonBxCollection>(edm::ProcessMatch(pn_), this);
+  getL1TEGammaParticleCollection_ = edm::GetterOfProducts<l1t::EGammaBxCollection>(edm::ProcessMatch(pn_), this);
+  getL1TJetParticleCollection_ = edm::GetterOfProducts<l1t::JetBxCollection>(edm::ProcessMatch(pn_), this);
+  getL1TTauParticleCollection_ = edm::GetterOfProducts<l1t::TauBxCollection>(edm::ProcessMatch(pn_), this);
+  getL1TEtSumParticleCollection_ = edm::GetterOfProducts<l1t::EtSumBxCollection>(edm::ProcessMatch(pn_), this);
   getPFJetCollection_ = edm::GetterOfProducts<reco::PFJetCollection>(edm::ProcessMatch(pn_), this);
   getPFTauCollection_ = edm::GetterOfProducts<reco::PFTauCollection>(edm::ProcessMatch(pn_), this);
+  getPFMETCollection_ = edm::GetterOfProducts<reco::PFMETCollection>(edm::ProcessMatch(pn_), this);
 
   callWhenNewProductsRegistered([this](edm::BranchDescription const& bd){
     getTriggerFilterObjectWithRefs_(bd);
@@ -114,8 +127,14 @@ TriggerSummaryProducerAOD::TriggerSummaryProducerAOD(const edm::ParameterSet& ps
     getL1JetParticleCollection_(bd);
     getL1EtMissParticleCollection_(bd);
     getL1HFRingsCollection_(bd);
+    getL1TMuonParticleCollection_(bd);
+    getL1TEGammaParticleCollection_(bd);
+    getL1TJetParticleCollection_(bd);
+    getL1TTauParticleCollection_(bd);
+    getL1TEtSumParticleCollection_(bd);
     getPFJetCollection_(bd);
     getPFTauCollection_(bd);
+    getPFMETCollection_(bd);
   });
 }
 
@@ -170,6 +189,7 @@ TriggerSummaryProducerAOD::produce(edm::Event& iEvent, const edm::EventSetup& iS
    using namespace reco;
    using namespace l1extra;
    using namespace trigger;
+   using namespace l1t;
 
    std::vector<edm::Handle<trigger::TriggerFilterObjectWithRefs> > fobs;
    getTriggerFilterObjectWithRefs_.fillHandles(iEvent, fobs);
@@ -215,8 +235,8 @@ TriggerSummaryProducerAOD::produce(edm::Event& iEvent, const edm::EventSetup& iS
    }
 
    /// accumulate for endJob printout
-   collectionTagsGlobal_.insert(collectionTagsEvent_.begin(),collectionTagsEvent_.end());
-   filterTagsGlobal_.insert(filterTagsEvent_.begin(),filterTagsEvent_.end());
+   collectionTagsStream_.insert(collectionTagsEvent_.begin(),collectionTagsEvent_.end());
+   filterTagsStream_.insert(filterTagsEvent_.begin(),filterTagsEvent_.end());
 
    /// debug printout
    if (isDebugEnabled()) {
@@ -262,9 +282,15 @@ TriggerSummaryProducerAOD::produce(edm::Event& iEvent, const edm::EventSetup& iS
    fillTriggerObjectCollections<              L1JetParticleCollection>(iEvent, getL1JetParticleCollection_);
    fillTriggerObjectCollections<           L1EtMissParticleCollection>(iEvent, getL1EtMissParticleCollection_);
    fillTriggerObjectCollections<                  L1HFRingsCollection>(iEvent, getL1HFRingsCollection_);
+   fillTriggerObjectCollections<                     MuonBxCollection>(iEvent, getL1TMuonParticleCollection_);
+   fillTriggerObjectCollections<                   EGammaBxCollection>(iEvent, getL1TEGammaParticleCollection_);
+   fillTriggerObjectCollections<                      JetBxCollection>(iEvent, getL1TJetParticleCollection_);
+   fillTriggerObjectCollections<                      TauBxCollection>(iEvent, getL1TTauParticleCollection_);
+   fillTriggerObjectCollections<                    EtSumBxCollection>(iEvent, getL1TEtSumParticleCollection_);
    ///
    fillTriggerObjectCollections<                      PFJetCollection>(iEvent, getPFJetCollection_);
    fillTriggerObjectCollections<                      PFTauCollection>(iEvent, getPFTauCollection_);
+   fillTriggerObjectCollections<                      PFMETCollection>(iEvent, getPFMETCollection_);
    ///
    const unsigned int nk(tags_.size());
    LogDebug("TriggerSummaryProducerAOD") << "Number of collections found: " << nk;
@@ -301,8 +327,14 @@ TriggerSummaryProducerAOD::produce(edm::Event& iEvent, const edm::EventSetup& iS
        fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1jetIds()    ,fobs[ifob]->l1jetRefs());
        fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1etmissIds() ,fobs[ifob]->l1etmissRefs());
        fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1hfringsIds(),fobs[ifob]->l1hfringsRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1tmuonIds()  ,fobs[ifob]->l1tmuonRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1tegammaIds(),fobs[ifob]->l1tegammaRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1tjetIds()   ,fobs[ifob]->l1tjetRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1ttauIds()   ,fobs[ifob]->l1ttauRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1tetsumIds() ,fobs[ifob]->l1tetsumRefs());
        fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->pfjetIds()    ,fobs[ifob]->pfjetRefs());
        fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->pftauIds()    ,fobs[ifob]->pftauRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->pfmetIds()    ,fobs[ifob]->pfmetRefs());
        product->addFilter(filterTag,ids_,keys_);
      }
    }
@@ -325,6 +357,7 @@ void TriggerSummaryProducerAOD::fillTriggerObjectCollections(const edm::Event& i
   using namespace reco;
   using namespace l1extra;
   using namespace trigger;
+  using namespace l1t;
 
   vector<Handle<C> > collections;
   getter.fillHandles(iEvent, collections);
@@ -399,6 +432,19 @@ void TriggerSummaryProducerAOD::fillTriggerObject(const l1extra::L1EtMissParticl
   return;
 }
 
+void TriggerSummaryProducerAOD::fillTriggerObject(const reco::PFMET& object) {
+
+  using namespace reco;
+  using namespace trigger;
+
+  toc_.push_back( TriggerObject(object) );
+  toc_.push_back(TriggerObject(TriggerTET    ,object.sumEt()         ,0.0,0.0,0.0));
+  toc_.push_back(TriggerObject(TriggerMETSig ,object.mEtSig()        ,0.0,0.0,0.0));
+  toc_.push_back(TriggerObject(TriggerELongit,object.e_longitudinal(),0.0,0.0,0.0));
+
+  return;
+}
+
 void TriggerSummaryProducerAOD::fillTriggerObject(const reco::CaloMET& object) {
 
   using namespace reco;
@@ -446,17 +492,26 @@ void TriggerSummaryProducerAOD::fillFilterObjectMembers(const edm::Event& iEvent
   const unsigned int n(min(ids.size(),refs.size()));
   for (unsigned int i=0; i!=n; ++i) {
     const ProductID pid(refs[i].id());
-    if (offset_.find(pid)==offset_.end()) {
+    if (!(pid.isValid())) {
+      LogError("TriggerSummaryProducerAOD")
+	<< "Iinvalid pid: " << pid
+	<< " FilterTag / Key: " << tag.encode()
+	<< " / " << i << "of" << n
+	<< " CollectionTag / Key: "
+	<< " <Unrecoverable>"
+	<< " / " << refs[i].key()
+	<< " CollectionType: " << typeid(C).name();
+    } else if (offset_.find(pid)==offset_.end()) {
       const string&    label(iEvent.getProvenance(pid).moduleLabel());
       const string& instance(iEvent.getProvenance(pid).productInstanceName());
       const string&  process(iEvent.getProvenance(pid).processName());
       LogError("TriggerSummaryProducerAOD")
-	<< "Uunknown pid:"
-	<< " FilterTag/Key: " << tag.encode()
-	<< "/" << i
-	<< " CollectionTag/Key: "
+	<< "Uunknown pid: " << pid
+	<< " FilterTag / Key: " << tag.encode()
+	<< " / " << i << "of" << n
+	<< " CollectionTag / Key: "
 	<< InputTag(label,instance,process).encode()
-	<< "/" << refs[i].key()
+	<< " / " << refs[i].key()
 	<< " CollectionType: " << typeid(C).name();
     } else {
       fillFilterObjectMember(offset_[pid],ids[i],refs[i]);
@@ -503,6 +558,24 @@ void TriggerSummaryProducerAOD::fillFilterObjectMember(const int& offset, const 
   return;
 }
 
+void TriggerSummaryProducerAOD::fillFilterObjectMember(const int& offset, const int& id, const edm::Ref<reco::PFMETCollection> & ref) {
+
+  using namespace trigger;
+
+  if ( (id==TriggerTHT) || (id==TriggerTET) ) {
+    keys_.push_back(offset+4*ref.key()+1);
+  } else if ( (id==TriggerMETSig) || (id==TriggerMHTSig) ) {
+    keys_.push_back(offset+4*ref.key()+2);
+  } else if ( (id==TriggerELongit) || (id==TriggerHLongit) ) {
+    keys_.push_back(offset+4*ref.key()+3);
+  } else {
+    keys_.push_back(offset+4*ref.key()+0);
+  }
+  ids_.push_back(id);
+
+  return;
+}
+
 void TriggerSummaryProducerAOD::fillFilterObjectMember(const int& offset, const int& id, const edm::Ref<reco::CaloMETCollection> & ref) {
 
   using namespace trigger;
@@ -539,30 +612,42 @@ void TriggerSummaryProducerAOD::fillFilterObjectMember(const int& offset, const 
   return;
 }
 
-void TriggerSummaryProducerAOD::endJob() {
+void TriggerSummaryProducerAOD::endStream() {
+  globalCache()->collectionTagsGlobal_.insert(collectionTagsStream_.begin(),collectionTagsStream_.end());
+  globalCache()->filterTagsGlobal_.insert(filterTagsStream_.begin(),filterTagsStream_.end());
+  return;
+}
+
+void TriggerSummaryProducerAOD::globalEndJob(const GlobalInputTags * globalInputTags) {
 
   using namespace std;
   using namespace edm;
   using namespace trigger;
 
   LogVerbatim("TriggerSummaryProducerAOD") << endl;
-  LogVerbatim("TriggerSummaryProducerAOD") << "TriggerSummaryProducerAOD::endJob - accumulated tags:" << endl;
+  LogVerbatim("TriggerSummaryProducerAOD") << "TriggerSummaryProducerAOD::globalEndJob - accumulated tags:" << endl;
 
-  const unsigned int nc(collectionTagsGlobal_.size());
-  const unsigned int nf(filterTagsGlobal_.size());
+  InputTagSet filterTags(false);
+  InputTagSet collectionTags(false);
+
+  filterTags.insert(globalInputTags->filterTagsGlobal_.begin(),globalInputTags->filterTagsGlobal_.end());
+  collectionTags.insert(globalInputTags->collectionTagsGlobal_.begin(),globalInputTags->collectionTagsGlobal_.end());
+
+  const unsigned int nc(collectionTags.size());
+  const unsigned int nf(filterTags.size());
   LogVerbatim("TriggerSummaryProducerAOD") << " Overall number of Collections/Filters: "
 		  << nc << "/" << nf << endl;
 
   LogVerbatim("TriggerSummaryProducerAOD") << " The collections: " << nc << endl;
-  const InputTagSet::const_iterator cb(collectionTagsGlobal_.begin());
-  const InputTagSet::const_iterator ce(collectionTagsGlobal_.end());
+  const InputTagSet::const_iterator cb(collectionTags.begin());
+  const InputTagSet::const_iterator ce(collectionTags.end());
   for ( InputTagSet::const_iterator ci=cb; ci!=ce; ++ci) {
     LogVerbatim("TriggerSummaryProducerAOD") << "  " << distance(cb,ci) << " " << ci->encode() << endl;
   }
 
   LogVerbatim("TriggerSummaryProducerAOD") << " The filters:" << nf << endl;
-  const InputTagSet::const_iterator fb(filterTagsGlobal_.begin());
-  const InputTagSet::const_iterator fe(filterTagsGlobal_.end());
+  const InputTagSet::const_iterator fb(filterTags.begin());
+  const InputTagSet::const_iterator fe(filterTags.end());
   for ( InputTagSet::const_iterator fi=fb; fi!=fe; ++fi) {
     LogVerbatim("TriggerSummaryProducerAOD") << "  " << distance(fb,fi) << " " << fi->encode() << endl;
   }

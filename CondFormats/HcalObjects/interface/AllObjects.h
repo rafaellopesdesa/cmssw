@@ -8,6 +8,7 @@
 #include "CondFormats/HcalObjects/interface/HcalGainWidths.h"
 #include "CondFormats/HcalObjects/interface/HcalQIEShape.h"
 #include "CondFormats/HcalObjects/interface/HcalQIEData.h"
+#include "CondFormats/HcalObjects/interface/HcalQIETypes.h"
 #include "CondFormats/HcalObjects/interface/HcalCalibrationQIEData.h"
 #include "CondFormats/HcalObjects/interface/HcalChannelQuality.h"
 #include "CondFormats/HcalObjects/interface/HcalElectronicsMap.h"
@@ -27,7 +28,13 @@
 #include "CondFormats/HcalObjects/interface/HcalCovarianceMatrices.h"
 #include "CondFormats/HcalObjects/interface/HcalRecoParams.h"
 #include "CondFormats/HcalObjects/interface/HcalLongRecoParams.h"
+#include "CondFormats/HcalObjects/interface/HcalZDCLowGainFractions.h"
 #include "CondFormats/HcalObjects/interface/HcalMCParams.h"
 #include "CondFormats/HcalObjects/interface/HcalFlagHFDigiTimeParams.h"
 #include "CondFormats/HcalObjects/interface/HcalTimingParams.h"
+#include "CondFormats/HcalObjects/interface/OOTPileupCorrectionBuffer.h"
+#include "CondFormats/HcalObjects/interface/HcalInterpolatedPulse.h"
+#include "CondFormats/HcalObjects/interface/HBHEChannelGroups.h"
+#include "CondFormats/HcalObjects/interface/HcalInterpolatedPulseColl.h"
+
 #endif

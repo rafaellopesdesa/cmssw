@@ -94,6 +94,8 @@ private:
 
   TProfile** m_averadius;
   TProfile** m_avez;
+  TProfile** m_avex;
+  TProfile** m_avey;
   TProfile** m_zavedr;
   TProfile** m_zavedz;
   TProfile** m_zavedrphi;
@@ -134,6 +136,8 @@ OccupancyPlots::OccupancyPlots(const edm::ParameterSet& iConfig):
 
   m_averadius = m_rhm.makeTProfile("averadius","Average Module Radius",6000,0.5,6000.5);
   m_avez = m_rhm.makeTProfile("avez","Average Module z coordinate",6000,0.5,6000.5);
+  m_avex = m_rhm.makeTProfile("avex","Average Module x coordinate",6000,0.5,6000.5);
+  m_avey = m_rhm.makeTProfile("avey","Average Module y coordinate",6000,0.5,6000.5);
 
   m_zavedr = m_rhm.makeTProfile("zavedr","Average z unit vector dr",6000,0.5,6000.5);
   m_zavedz = m_rhm.makeTProfile("zavedz","Average z unit vector dz",6000,0.5,6000.5);
@@ -227,6 +231,21 @@ OccupancyPlots::endRun(const edm::Run& iRun, const edm::EventSetup& iSetup) {
   edm::ESHandle<TrackerGeometry> trkgeo;
   iSetup.get<TrackerDigiGeometryRecord>().get("",trkgeo);
 
+  // Test new TrackerGeometry features
+  LogDebug("IsThereTest") << "Test of TrackerGeometry::isThere";
+  LogTrace("IsThereTest") << " is there PixelBarrel: " << trkgeo->isThere(GeomDetEnumerators::PixelBarrel);
+  LogTrace("IsThereTest") << " is there PixelEndcap: " << trkgeo->isThere(GeomDetEnumerators::PixelEndcap);
+  LogTrace("IsThereTest") << " is there P1PXB: " << trkgeo->isThere(GeomDetEnumerators::P1PXB);
+  LogTrace("IsThereTest") << " is there P1PXEC: " << trkgeo->isThere(GeomDetEnumerators::P1PXEC);
+  LogTrace("IsThereTest") << " is there P2PXEC: " << trkgeo->isThere(GeomDetEnumerators::P2PXEC);
+  LogTrace("IsThereTest") << " is there TIB: " << trkgeo->isThere(GeomDetEnumerators::TIB);
+  LogTrace("IsThereTest") << " is there TID: " << trkgeo->isThere(GeomDetEnumerators::TID);
+  LogTrace("IsThereTest") << " is there TOB: " << trkgeo->isThere(GeomDetEnumerators::TOB);
+  LogTrace("IsThereTest") << " is there TEC: " << trkgeo->isThere(GeomDetEnumerators::TEC);
+  LogTrace("IsThereTest") << " is there P2OTB: " << trkgeo->isThere(GeomDetEnumerators::P2OTB);
+  LogTrace("IsThereTest") << " is there P2OTEC: " << trkgeo->isThere(GeomDetEnumerators::P2OTEC);
+
+
   const Local2DPoint center(0.,0.);
   const Local3DPoint locz(0.,0.,1.);
   const Local3DPoint locx(1.,0.,0.);
@@ -265,6 +284,8 @@ OccupancyPlots::endRun(const edm::Run& iRun, const edm::EventSetup& iSetup) {
 	 // average positions
 	 if(m_averadius && *m_averadius) (*m_averadius)->Fill(sel->first,position.perp());
 	 if(m_avez && *m_avez) (*m_avez)->Fill(sel->first,position.z());
+	 if(m_avex && *m_avex) (*m_avex)->Fill(sel->first,position.x());
+	 if(m_avey && *m_avey) (*m_avey)->Fill(sel->first,position.y());
 	 if(m_zavedr && *m_zavedr) (*m_zavedr)->Fill(sel->first,dzdr);
 	 if(m_zavedz && *m_zavedz) (*m_zavedz)->Fill(sel->first,dz.z());
 	 if(m_zavedrphi && *m_zavedrphi) (*m_zavedrphi)->Fill(sel->first,dzdrphi);
@@ -278,6 +299,12 @@ OccupancyPlots::endRun(const edm::Run& iRun, const edm::EventSetup& iSetup) {
      }
   }
 
+  // counting the number of channels per module subset
+
+  // the histograms have to be reset to avoid double counting if endRun is called more than once
+
+  if(m_nchannels_ideal && *m_nchannels_ideal) (*m_nchannels_ideal)->Reset();
+  if(m_nchannels_real && *m_nchannels_real) (*m_nchannels_real)->Reset();
 
   edm::ESHandle<SiStripQuality> quality;
   iSetup.get<SiStripQualityRcd>().get("",quality);

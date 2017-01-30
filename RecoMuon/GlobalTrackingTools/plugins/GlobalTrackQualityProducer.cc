@@ -21,7 +21,7 @@
 
 #include "TrackingTools/PatternTools/interface/TrajectoryMeasurement.h"
 #include "TrackingTools/PatternTools/interface/Trajectory.h"
-#include "Geometry/Records/interface/IdealGeometryRecord.h"
+#include "Geometry/Records/interface/TrackerTopologyRcd.h"
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
 
 GlobalTrackQualityProducer::GlobalTrackQualityProducer(const edm::ParameterSet& iConfig):
@@ -76,7 +76,7 @@ GlobalTrackQualityProducer::produce(edm::Event& iEvent, const edm::EventSetup& i
 
   //Retrieve tracker topology from geometry
   edm::ESHandle<TrackerTopology> tTopoHand;
-  iSetup.get<IdealGeometryRecord>().get(tTopoHand);
+  iSetup.get<TrackerTopologyRcd>().get(tTopoHand);
   const TrackerTopology *tTopo=tTopoHand.product();
 
 
@@ -262,7 +262,9 @@ std::pair<double,double> GlobalTrackQualityProducer::newChi2(Trajectory& muon) c
   for ( TMI m = meas.begin(); m != meas.end(); m++ ) {
     TransientTrackingRecHit::ConstRecHitPointer hit = m->recHit();
     const TrajectoryStateOnSurface& uptsos = (*m).updatedState();
-    TransientTrackingRecHit::RecHitPointer preciseHit = hit->clone(uptsos);
+    // FIXME FIXME CLONE!!!
+    // TrackingRecHit::RecHitPointer preciseHit = hit->clone(uptsos);
+    auto preciseHit = hit;
     double estimate = 0.0;
     if (preciseHit->isValid() && uptsos.isValid()) {
       estimate = theEstimator->estimate(uptsos, *preciseHit ).second;

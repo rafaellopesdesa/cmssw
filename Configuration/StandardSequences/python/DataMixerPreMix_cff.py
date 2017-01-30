@@ -19,12 +19,12 @@ DMEcalPreshowerDigis = simEcalPreshowerDigis.clone()
 
 # Re-define inputs to point at DataMixer output
 DMEcalTriggerPrimitiveDigis.Label = cms.string('mixData')
-DMEcalTriggerPrimitiveDigis.InstanceEB = cms.string('EBDigiCollectionDM')
-DMEcalTriggerPrimitiveDigis.InstanceEE = cms.string('EEDigiCollectionDM')
+DMEcalTriggerPrimitiveDigis.InstanceEB = cms.string('')
+DMEcalTriggerPrimitiveDigis.InstanceEE = cms.string('')
 #
 DMEcalDigis.digiProducer = cms.string('mixData')
-DMEcalDigis.EBdigiCollection = cms.string('EBDigiCollectionDM')
-DMEcalDigis.EEdigiCollection = cms.string('EEDigiCollectionDM')
+DMEcalDigis.EBdigiCollection = cms.string('')
+DMEcalDigis.EEdigiCollection = cms.string('')
 DMEcalDigis.trigPrimProducer = cms.string('DMEcalTriggerPrimitiveDigis')
 #
 DMEcalPreshowerDigis.digiProducer = cms.string('mixData')
@@ -52,5 +52,20 @@ postDMDigi = cms.Sequence(ecalDigiSequenceDM+hcalDigiSequenceDM)
 # disable adding noise to HCAL cells with no MC signal
 #mixData.doEmpty = False
 
-pdatamix = cms.Sequence(mixData+postDMDigi)
+#
+# TrackingParticle Producer is now part of the mixing module, so
+# it is no longer run here.
+#
+from SimGeneral.PileupInformation.AddPileupSummaryPreMixed_cfi import *
 
+
+
+pdatamix = cms.Sequence(mixData+postDMDigi+addPileupInfo)
+
+from Configuration.StandardSequences.Eras import eras
+if eras.fastSim.isChosen():
+    # pretend these digis have been through digi2raw and raw2digi, by using the approprate aliases
+    # use an alias to make the mixed track collection available under the usual label
+    from FastSimulation.Configuration.DigiAliases_cff import loadDigiAliases
+    loadDigiAliases(premix = True)
+    from FastSimulation.Configuration.DigiAliases_cff import generalTracks,ecalPreshowerDigis,ecalDigis,hcalDigis,muonDTDigis,muonCSCDigis,muonRPCDigis

@@ -39,6 +39,8 @@
 #include "DataFormats/L1GlobalMuonTrigger/interface/L1MuGMTReadoutCollection.h"
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/Utilities/interface/InputTag.h"
 
 #include "FWCore/Framework/interface/EventSetup.h"
@@ -97,6 +99,7 @@ L1GlobalTriggerRawToDigi::L1GlobalTriggerRawToDigi(const edm::ParameterSet& pSet
     produces<std::vector<L1MuRegionalCand> > ("RPCb");
     produces<std::vector<L1MuRegionalCand> > ("RPCf");
     produces<std::vector<L1MuGMTCand> > ();
+    consumes<FEDRawDataCollection>(m_daqGtInputTag);
 
     // create GTFE, FDL, PSB cards once per producer
     // content will be reset whenever needed
@@ -139,6 +142,35 @@ L1GlobalTriggerRawToDigi::~L1GlobalTriggerRawToDigi() {
     delete m_gtPsbWord;
 
 }
+
+void L1GlobalTriggerRawToDigi::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+  edm::ParameterSetDescription desc;
+  static const char* const kComm1=
+    "# input tag for GT readout collection: \n"
+    "#     source = hardware record, \n"    
+    "#     l1GtPack = GT packer (DigiToRaw)"; 
+  desc.add<edm::InputTag>("DaqGtInputTag",edm::InputTag("l1GtPack"))->setComment(kComm1);
+  static const char* const kComm2=
+    "# FED Id for GT DAQ record \n"
+    "# default value defined in DataFormats/FEDRawData/src/FEDNumbering.cc";
+  desc.addUntracked<int>("DaqGtFedId",FEDNumbering::MAXTriggerGTPFEDID)->setComment(kComm2);
+  static const char* const kComm3=
+    "# mask for active boards (actually 16 bits) \n"
+    "#      if bit is zero, the corresponding board will not be unpacked \n"
+    "#      default: no board masked";
+  desc.add<unsigned int>("ActiveBoardsMask",0xFFFF)->setComment(kComm3);
+  static const char* const kComm4=
+    "# number of 'bunch crossing in the event' (bxInEvent) to be unpacked \n"
+    "# symmetric around L1Accept (bxInEvent = 0): \n"
+    "#    1 (bxInEvent = 0); 3 (F 0 1) (standard record); 5 (E F 0 1 2) (debug record) \n"
+    "# even numbers (except 0) 'rounded' to the nearest lower odd number \n"
+    "# negative value: unpack all available bxInEvent \n"
+    "# if more bxInEvent than available are required, unpack what exists and write a warning";
+  desc.add<int>("UnpackBxInEvent",-1)->setComment(kComm4);
+  desc.addUntracked<int>("Verbosity",0);
+  descriptions.add("l1GlobalTriggerRawToDigi",desc);
+}
+
 
 // member functions
 
@@ -229,11 +261,7 @@ void L1GlobalTriggerRawToDigi::produce(edm::Event& iEvent, const edm::EventSetup
     int headerSize = 8;
 
     if ((ptrGt + headerSize) > endPtrGt) {
-        edm::LogError("L1GlobalTriggerRawToDigi")
-                << "\nError: Pointer after header greater than end pointer."
-                << "\n Put empty products in the event!"
-                << "\n Quit unpacking this event." << std::endl;
-
+      // a common error - no need to print an error anymore
         produceEmptyProducts(iEvent);
 
         return;

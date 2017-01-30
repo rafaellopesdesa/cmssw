@@ -3,12 +3,13 @@
 #include "FWCore/Framework/interface/LuminosityBlockPrincipal.h"
 #include "FWCore/Framework/interface/Run.h"
 #include "FWCore/Utilities/interface/Algorithms.h"
+#include "FWCore/Utilities/interface/get_underlying_safe.h"
 
 namespace edm {
 
   std::string const LuminosityBlock::emptyString_;
 
-  LuminosityBlock::LuminosityBlock(LuminosityBlockPrincipal& lbp, ModuleDescription const& md,
+  LuminosityBlock::LuminosityBlock(LuminosityBlockPrincipal const& lbp, ModuleDescription const& md,
                                    ModuleCallingContext const* moduleCallingContext) :
         provRecorder_(lbp, md),
         aux_(lbp.aux()),
@@ -17,9 +18,6 @@ namespace edm {
   }
 
   LuminosityBlock::~LuminosityBlock() {
-    // anything left here must be the result of a failure
-    // let's record them as failed attempts in the event principal
-    for_all(putProducts_, principal_get_adapter_detail::deleter());
   }
 
   LuminosityBlockIndex
@@ -31,11 +29,6 @@ namespace edm {
   LuminosityBlock::cacheIdentifier() const {return luminosityBlockPrincipal().cacheIdentifier();}
 
   
-  LuminosityBlockPrincipal&
-  LuminosityBlock::luminosityBlockPrincipal() {
-    return dynamic_cast<LuminosityBlockPrincipal&>(provRecorder_.principal());
-  }
-
   void
   LuminosityBlock::setConsumer(EDConsumerBase const* iConsumer) {
     provRecorder_.setConsumer(iConsumer);
@@ -43,6 +36,13 @@ namespace edm {
       const_cast<Run*>(run_.get())->setConsumer(iConsumer);
     }
   }
+  
+  void
+  LuminosityBlock::setSharedResourcesAcquirer( SharedResourcesAcquirer* iResourceAcquirer) {
+    provRecorder_.setSharedResourcesAcquirer(iResourceAcquirer);
+    const_cast<Run*>(run_.get())->setSharedResourcesAcquirer(iResourceAcquirer);
+  }
+
 
   LuminosityBlockPrincipal const&
   LuminosityBlock::luminosityBlockPrincipal() const {
@@ -61,14 +61,12 @@ namespace edm {
 
   void
   LuminosityBlock::commit_() {
-    LuminosityBlockPrincipal& lbp = luminosityBlockPrincipal();
+    LuminosityBlockPrincipal const& lbp = luminosityBlockPrincipal();
     ProductPtrVec::iterator pit(putProducts().begin());
     ProductPtrVec::iterator pie(putProducts().end());
 
     while(pit != pie) {
-        lbp.put(*pit->second, pit->first);
-        // Ownership has passed, so clear the pointer.
-        pit->first.reset();
+        lbp.put(*pit->second, std::move(get_underlying_safe(pit->first)));
         ++pit;
     }
 

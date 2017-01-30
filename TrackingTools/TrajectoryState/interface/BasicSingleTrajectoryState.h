@@ -2,20 +2,24 @@
 #define BasicSingleTrajectoryState_H
 
 #include "TrackingTools/TrajectoryState/interface/BasicTrajectoryState.h"
+#include<cassert>
 
 
 /** Concrete implementation for the state of one trajectory on a surface.
  */
 
-class BasicSingleTrajectoryState  GCC11_FINAL : public BasicTrajectoryState {
+class BasicSingleTrajectoryState  final : public BasicTrajectoryState {
 public:
   BasicSingleTrajectoryState() :  BasicTrajectoryState(){}
   template<typename... Args>
-  BasicSingleTrajectoryState(Args && ...args) : BasicTrajectoryState(std::forward<Args>(args)...){}
+    BasicSingleTrajectoryState(Args && ...args) : BasicTrajectoryState(std::forward<Args>(args)...){/* assert(weight()>0);*/}
 
-  BasicSingleTrajectoryState* clone() const {
-    return new BasicSingleTrajectoryState(*this);
+  pointer clone() const override {
+    return build<BasicSingleTrajectoryState>(*this);
   }
+
+  std::vector<TrajectoryStateOnSurface> components() const override;
+
 
 };
 

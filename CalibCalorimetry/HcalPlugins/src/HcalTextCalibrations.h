@@ -17,6 +17,7 @@ class HcalPedestalWidthsRcd;
 class HcalGainsRcd;
 class HcalGainWidthsRcd;
 class HcalQIEDataRcd;
+class HcalQIETypesRcd;
 class HcalChannelQualityRcd;
 class HcalElectronicsMapRcd;
 class HcalRespCorrsRcd;
@@ -33,6 +34,7 @@ class HcalCholeskyMatricesRcd;
 class HcalCovarianceMatricesRcd;
 class HcalRecoParamsRcd;
 class HcalLongRecoParamsRcd;
+class HcalZDCLowGainFractionsRcd;
 class HcalMCParamsRcd;
 class HcalFlagHFDigiTimeParamsRcd;
 class HcalTimingParamsRcd;
@@ -56,6 +58,7 @@ protected:
   std::auto_ptr<HcalGains> produceGains (const HcalGainsRcd& rcd);
   std::auto_ptr<HcalGainWidths> produceGainWidths (const HcalGainWidthsRcd& rcd);
   std::auto_ptr<HcalQIEData> produceQIEData (const HcalQIEDataRcd& rcd);
+  std::auto_ptr<HcalQIETypes> produceQIETypes (const HcalQIETypesRcd& rcd);
   std::auto_ptr<HcalChannelQuality> produceChannelQuality (const HcalChannelQualityRcd& rcd);
   std::auto_ptr<HcalElectronicsMap> produceElectronicsMap (const HcalElectronicsMapRcd& rcd);
 
@@ -68,6 +71,7 @@ protected:
 
   std::auto_ptr<HcalRecoParams> produceRecoParams (const HcalRecoParamsRcd& rcd);
   std::auto_ptr<HcalLongRecoParams> produceLongRecoParams (const HcalLongRecoParamsRcd& rcd);
+  std::auto_ptr<HcalZDCLowGainFractions> produceZDCLowGainFractions (const HcalZDCLowGainFractionsRcd& rcd);
   std::auto_ptr<HcalMCParams> produceMCParams (const HcalMCParamsRcd& rcd);
   std::auto_ptr<HcalFlagHFDigiTimeParams> produceFlagHFDigiTimeParams (const HcalFlagHFDigiTimeParamsRcd& rcd);
 

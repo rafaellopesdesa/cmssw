@@ -3,7 +3,7 @@ import FWCore.ParameterSet.Config as cms
 # single top muonique
 SingleTopSingleMuonHLTValidation = cms.EDAnalyzer('TopSingleLeptonHLTValidation',
         # Directory
-        sDir         = cms.untracked.string('HLTValidation/SingleTop/SingleMuon/'),
+        sDir         = cms.untracked.string('HLT/TopHLTValidation/SingleTop/SingleMuon/'),
         # Electrons
         sElectrons   = cms.untracked.string('gedGsfElectrons'),
         ptElectrons  = cms.untracked.double(30.),
@@ -17,19 +17,21 @@ SingleTopSingleMuonHLTValidation = cms.EDAnalyzer('TopSingleLeptonHLTValidation'
         isoMuons     = cms.untracked.double(0.12),
         minMuons     = cms.untracked.uint32(1),
         # Jets
-        sJets        = cms.untracked.string('ak5PFJets'),
+        sJets        = cms.untracked.string('ak4PFJetsCHS'),
         ptJets       = cms.untracked.double(40.),
         etaJets      = cms.untracked.double(5.),
         minJets      = cms.untracked.uint32(2),
         # Trigger
-        sTrigger     = cms.untracked.string("TriggerResults"),
-        vsPaths      = cms.untracked.vstring(['HLT_IsoMu17_eta2p1_TriCentralPFNoPUJet45_35_25','HLT_IsoMu17_eta2p1_TriCentralPFNoPUJet30']),
+        iTrigger     = cms.untracked.InputTag("TriggerResults","","HLT"),
+
+### Updating to HLT paths to be monitored by TOP PAG in 2016 
+        vsPaths     = cms.untracked.vstring(['HLT_IsoMu18_v', 'HLT_IsoMu20_v', 'HLT_IsoMu22_v', 'HLT_IsoMu24_v', 'HLT_IsoTkMu18_v', 'HLT_IsoTkMu20_v', 'HLT_IsoTkMu22_v', 'HLT_IsoTkMu24_v','HLT_IsoMu17_eta2p1_v','HLT_IsoMu20_eta2p1_v','HLT_IsoMu24_eta2p1_v','HLT_IsoTkMu20_eta2p1_v','HLT_IsoTkMu24_eta2p1_v']),
 )
 
 # single top electronique
 SingleTopSingleElectronHLTValidation = cms.EDAnalyzer('TopSingleLeptonHLTValidation',
         # Directory
-        sDir         = cms.untracked.string('HLTValidation/SingleTop/SingleElectron/'),
+        sDir         = cms.untracked.string('HLT/TopHLTValidation/SingleTop/SingleElectron/'),
         # Electrons
         sElectrons   = cms.untracked.string('gedGsfElectrons'),
         ptElectrons  = cms.untracked.double(30.),
@@ -43,11 +45,13 @@ SingleTopSingleElectronHLTValidation = cms.EDAnalyzer('TopSingleLeptonHLTValidat
         isoMuons     = cms.untracked.double(0.12),
         minMuons     = cms.untracked.uint32(0),
         # Jets
-        sJets        = cms.untracked.string('ak5PFJets'),
+        sJets        = cms.untracked.string('ak4PFJetsCHS'),
         ptJets       = cms.untracked.double(40.),
         etaJets      = cms.untracked.double(5.),
         minJets      = cms.untracked.uint32(2),
         # Trigger
-        sTrigger     = cms.untracked.string("TriggerResults"),
-        vsPaths      = cms.untracked.vstring(['HLT_Ele25_CaloIdVT_CaloIsoVL_TrkIdVL_TrkIsoT_TriCentralPFNoPUJet45_35_25','HLT_Ele25_CaloIdVT_CaloIsoVL_TrkIdVL_TrkIsoT_TriCentralPFNoPUJet30']),
+        iTrigger     = cms.untracked.InputTag("TriggerResults","","HLT"),
+
+### Updating to HLT paths to be monitored by TOP PAG in 2016                                                                                                                 
+        vsPaths     = cms.untracked.vstring(['HLT_Ele27_WPLoose_Gsf_v','HLT_Ele25_WPTight_Gsf_v','HLT_Ele23_WPLoose_Gsf_v','HLT_Ele25_eta2p1_WPTight_Gsf_v', 'HLT_Ele27_WPTight_Gsf_v','HLT_Ele27_eta2p1_WPLoose_Gsf_v', 'HLT_Ele22_eta2p1_WPLoose_Gsf_v', 'HLT_Ele24_eta2p1_WPLoose_Gsf_v','HLT_Ele25_eta2p1_WPLoose_Gsf_v']),
 )

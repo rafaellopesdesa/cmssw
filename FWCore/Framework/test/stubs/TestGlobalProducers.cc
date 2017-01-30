@@ -46,6 +46,10 @@ struct UnsafeCache {
    unsigned int strm;
    unsigned int work;
 };
+
+struct Dummy {
+};
+
 } //end anonymous namespace
 
   class StreamIntProducer : public edm::global::EDProducer<edm::StreamCache<UnsafeCache>> {
@@ -160,7 +164,7 @@ struct UnsafeCache {
 
     std::shared_ptr<Cache> globalBeginRun(edm::Run const& iRun, edm::EventSetup const&) const override {
       ++m_count;
-      std::shared_ptr<Cache> rCache(new Cache);
+      auto rCache = std::make_shared<Cache>();
       ++(rCache->run);
       return rCache;
     }
@@ -228,7 +232,7 @@ struct UnsafeCache {
     
     std::shared_ptr<Cache> globalBeginLuminosityBlock(edm::LuminosityBlock const& iLB, edm::EventSetup const&) const override {
       ++m_count;
-      std::shared_ptr<Cache> lCache(new Cache);
+      auto lCache = std::make_shared<Cache>();
       ++(lCache->lumi);  
       return lCache;
     }
@@ -304,7 +308,7 @@ struct UnsafeCache {
 
     std::shared_ptr<UnsafeCache> globalBeginRunSummary(edm::Run const& iRun, edm::EventSetup const&) const override {
       ++m_count;
-      std::shared_ptr<UnsafeCache> gCache(new UnsafeCache);
+      auto gCache = std::make_shared<UnsafeCache>();
       ++(gCache->run);
       return gCache;
     }
@@ -365,7 +369,7 @@ struct UnsafeCache {
 
     std::shared_ptr<UnsafeCache> globalBeginLuminosityBlockSummary(edm::LuminosityBlock const& iLB, edm::EventSetup const&) const override {
       ++m_count;
-      std::shared_ptr<UnsafeCache> gCache(new UnsafeCache);
+      auto gCache = std::make_shared<UnsafeCache>();
       ++(gCache->lumi);
        return gCache;
     }
@@ -406,7 +410,7 @@ struct UnsafeCache {
     }
   };
 
-  class TestBeginRunProducer : public edm::global::EDProducer<edm::RunCache<void>,edm::BeginRunProducer> {
+  class TestBeginRunProducer : public edm::global::EDProducer<edm::RunCache<Dummy>,edm::BeginRunProducer> {
   public:
     explicit TestBeginRunProducer(edm::ParameterSet const& p) :
 	trans_(p.getParameter<int>("transitions")) {	
@@ -417,9 +421,9 @@ struct UnsafeCache {
     mutable std::atomic<unsigned int> m_count{0};
     mutable std::atomic<bool> brp{false}; 
  
-    std::shared_ptr<void> globalBeginRun(edm::Run const& iRun, edm::EventSetup const&) const override {
+    std::shared_ptr<Dummy> globalBeginRun(edm::Run const& iRun, edm::EventSetup const&) const override {
       brp = false;
-      return std::shared_ptr<void>();
+      return std::shared_ptr<Dummy>();
     }
 
     void produce(edm::StreamID iID, edm::Event&, edm::EventSetup const&) const override {
@@ -446,7 +450,7 @@ struct UnsafeCache {
 
   };
 
-  class TestEndRunProducer : public edm::global::EDProducer<edm::RunCache<void>,edm::EndRunProducer> {
+  class TestEndRunProducer : public edm::global::EDProducer<edm::RunCache<Dummy>,edm::EndRunProducer> {
   public:
     explicit TestEndRunProducer(edm::ParameterSet const& p) :
 	trans_(p.getParameter<int>("transitions")) {	
@@ -456,9 +460,9 @@ struct UnsafeCache {
     mutable std::atomic<unsigned int> m_count{0};
     mutable std::atomic<bool> p{false}; 
 
-    std::shared_ptr<void> globalBeginRun(edm::Run const& iRun, edm::EventSetup const&) const override {
+    std::shared_ptr<Dummy> globalBeginRun(edm::Run const& iRun, edm::EventSetup const&) const override {
       p = false;
-      return std::shared_ptr<void>();
+      return std::shared_ptr<Dummy>();
     }
 
     void produce(edm::StreamID iID, edm::Event&, edm::EventSetup const&) const override {
@@ -507,7 +511,7 @@ struct UnsafeCache {
       }
     }
 
-    void globalBeginLuminosityBlockProduce(edm::LuminosityBlock&, edm::EventSetup const&) const {
+    void globalBeginLuminosityBlockProduce(edm::LuminosityBlock&, edm::EventSetup const&) const override {
       ++m_count;
       gblp = true;
     }

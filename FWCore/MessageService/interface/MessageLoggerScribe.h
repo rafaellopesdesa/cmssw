@@ -2,6 +2,7 @@
 #define FWCore_MessageService_MessageLoggerScribe_h
 
 #include "FWCore/Utilities/interface/value_ptr.h"
+#include "FWCore/Utilities/interface/propagate_const.h"
 
 #include "FWCore/MessageService/interface/ELdestControl.h"
 #include "FWCore/MessageService/interface/MessageLoggerDefaults.h"
@@ -10,7 +11,7 @@
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
-#include "boost/shared_ptr.hpp"
+#include <memory>
 
 #include <iosfwd>
 #include <vector>
@@ -88,7 +89,7 @@ public:
   
   // ChangeLog 12
   /// --- If queue is NULL, this sets singleThread true 
-  explicit MessageLoggerScribe(boost::shared_ptr<ThreadQueue> queue);
+  explicit MessageLoggerScribe(std::shared_ptr<ThreadQueue> queue);
   
   virtual ~MessageLoggerScribe();
 
@@ -217,12 +218,12 @@ private:
   void parseCategories (std::string const & s, std::vector<std::string> & cats);
   
   // --- data:
-  boost::shared_ptr<ELadministrator>  admin_p;
+  edm::propagate_const<std::shared_ptr<ELadministrator>> admin_p;
   ELdestControl                       early_dest;
-  std::vector<boost::shared_ptr<std::ofstream> > file_ps;
-  boost::shared_ptr<PSet>             job_pset_p;
+  std::vector<edm::propagate_const<std::shared_ptr<std::ofstream>>> file_ps;
+  edm::propagate_const<std::shared_ptr<PSet>> job_pset_p;
   std::vector<NamedDestination     *> extern_dests;
-  std::map<String,std::ostream     *> stream_ps;
+  std::map<String,edm::propagate_const<std::ostream*>> stream_ps;
   std::vector<String> 	  	      ordinary_destination_filenames;
   std::vector<ELdestControl>          statisticsDestControls;
   std::vector<bool>                   statisticsResets;
@@ -233,7 +234,7 @@ private:
   bool 				      done;			// changeLog 9
   bool 				      purge_mode;		// changeLog 9
   int				      count;			// changeLog 9
-  boost::shared_ptr<ThreadQueue>      m_queue;			// changeLog 12
+  edm::propagate_const<std::shared_ptr<ThreadQueue>> m_queue;	// changeLog 12
       
 };  // MessageLoggerScribe
 

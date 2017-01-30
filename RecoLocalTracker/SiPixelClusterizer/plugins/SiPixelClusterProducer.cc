@@ -12,8 +12,8 @@
  */
 
 // Our own stuff
-#include "RecoLocalTracker/SiPixelClusterizer/interface/SiPixelClusterProducer.h"
-#include "RecoLocalTracker/SiPixelClusterizer/interface/PixelThresholdClusterizer.h"
+#include "SiPixelClusterProducer.h"
+#include "PixelThresholdClusterizer.h"
 
 // Geometry
 #include "Geometry/Records/interface/TrackerDigiGeometryRecord.h"
@@ -42,8 +42,6 @@
 // MessageLogger
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
-namespace cms
-{
 
   //---------------------------------------------------------------------------
   //!  Constructor: set the ParameterSet and defer all thinking to setupClusterizer().
@@ -83,12 +81,6 @@ namespace cms
     delete theSiPixelGainCalibration_;
   }  
 
-  //void SiPixelClusterProducer::beginJob( const edm::EventSetup& es ) 
-  void SiPixelClusterProducer::beginJob( ) 
-  {
-    edm::LogInfo("SiPixelClusterizer") << "[SiPixelClusterizer::beginJob]";
-    clusterizer_->setSiPixelGainCalibrationService(theSiPixelGainCalibration_);
-  }
   
   //---------------------------------------------------------------------------
   //! The "Event" entrypoint: gets called by framework for every event
@@ -117,6 +109,7 @@ namespace cms
     run(*input, geom, *output );
 
     // Step D: write output to file
+    output->shrink_to_fit();
     e.put( output );
 
   }
@@ -132,6 +125,7 @@ namespace cms
 
     if ( clusterMode_ == "PixelThresholdClusterizer" ) {
       clusterizer_ = new PixelThresholdClusterizer(conf_);
+      clusterizer_->setSiPixelGainCalibrationService(theSiPixelGainCalibration_);
       readyToCluster_ = true;
     } 
     else {
@@ -181,6 +175,7 @@ namespace cms
 	// Fatal error!  TO DO: throw an exception!
 	assert(0);
       }
+      {
       // Produce clusters for this DetUnit and store them in 
       // a DetSet
       edmNew::DetSetVector<SiPixelCluster>::FastFiller spc(output, DSViter->detId());
@@ -190,7 +185,7 @@ namespace cms
       } else {
 	numberOfClusters += spc.size();
       }
-
+      } // spc is not deleted and detsetvector updated
       if ((maxTotalClusters_ >= 0) && (numberOfClusters > maxTotalClusters_)) {
         edm::LogError("TooManyClusters") <<  "Limit on the number of clusters exceeded. An empty cluster collection will be produced instead.\n";
         edmNew::DetSetVector<SiPixelCluster> empty;
@@ -204,4 +199,11 @@ namespace cms
     //				    << " SiPixelClusters in " << numberOfDetUnits << " DetUnits."; 
   }
 
-}  // end of namespace cms
+
+
+
+#include "FWCore/PluginManager/interface/ModuleDef.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+
+DEFINE_FWK_MODULE(SiPixelClusterProducer);
+

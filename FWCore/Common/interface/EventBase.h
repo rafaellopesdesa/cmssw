@@ -19,7 +19,6 @@
 // Original Author:  Chris Jones
 //         Created:  Thu Aug 27 11:01:06 CDT 2009
 //
-#if !defined(__CINT__) && !defined(__MAKECINT__)
 
 // user include files
 #include "DataFormats/Common/interface/BasicHandle.h"
@@ -39,6 +38,7 @@
 namespace edm {
 
    class ProcessHistory;
+   class ProductID;
    class TriggerResults;
    class TriggerNames;
 
@@ -51,6 +51,9 @@ namespace edm {
       // ---------- const member functions ---------------------
       template<typename T>
       bool getByLabel(InputTag const&, Handle<T>&) const;
+
+      template<typename T>
+      bool get(ProductID const&, Handle<T>&) const;
 
       // AUX functions.
       edm::EventID id() const {return eventAuxiliary().id();}
@@ -77,11 +80,11 @@ namespace edm {
       //EventBase const& operator=(EventBase const&); // allow default
 
       virtual BasicHandle getByLabelImpl(std::type_info const& iWrapperType, std::type_info const& iProductType, InputTag const& iTag) const = 0;
+      virtual BasicHandle getImpl(std::type_info const& iProductType, ProductID const& iTag) const = 0;
       // ---------- member data --------------------------------
 
    };
 
-#if !defined(__REFLEX__)
    template<typename T>
    bool
    EventBase::getByLabel(InputTag const& tag, Handle<T>& result) const {
@@ -93,9 +96,19 @@ namespace edm {
       }
       return true;
    }
-#endif
+
+   template<typename T>
+   bool
+   EventBase::get(ProductID const& pid, Handle<T>& result) const {
+      result.clear();
+      BasicHandle bh = this->getImpl(typeid(T), pid);
+      convert_handle(std::move(bh), result);  // throws on conversion error
+      if (result.failedToGet()) {
+         return false;
+      }
+      return true;
+   }
   
 }
-#endif /*!defined(__CINT__) && !defined(__MAKECINT__)*/
 
 #endif

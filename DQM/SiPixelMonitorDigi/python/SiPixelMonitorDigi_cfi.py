@@ -1,6 +1,12 @@
 import FWCore.ParameterSet.Config as cms
 
+#
+# This object is used to make changes for different running scenarios
+#
+from Configuration.StandardSequences.Eras import eras
+
 SiPixelDigiSource = cms.EDAnalyzer("SiPixelDigiSource",
+    TopFolderName = cms.string('Pixel'),
     src = cms.InputTag("siPixelDigis"),
     outputFile = cms.string('Pixel_DQM_Digi.root'),
     saveFile = cms.untracked.bool(False),
@@ -25,4 +31,6 @@ SiPixelDigiSource = cms.EDAnalyzer("SiPixelDigiSource",
     bigEventSize = cms.untracked.int32(1000)
 )
 
+# Modify for if the phase 1 pixel detector is active
+eras.phase1Pixel.toModify( SiPixelDigiSource, isUpgrade=cms.untracked.bool(True) )
 

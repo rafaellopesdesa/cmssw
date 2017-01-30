@@ -2,7 +2,7 @@
 #define MeasurementTrackerEventProducer_h
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDProducer.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
 
 #include "FWCore/Framework/interface/Event.h"
 
@@ -11,12 +11,12 @@
 #include "DataFormats/Common/interface/ContainerMask.h"
 #include "DataFormats/DetId/interface/DetIdCollection.h"
 
-class MeasurementTrackerEventProducer : public edm::EDProducer {
+class dso_hidden MeasurementTrackerEventProducer final : public edm::stream::EDProducer<> {
 public:
       explicit MeasurementTrackerEventProducer(const edm::ParameterSet &iConfig) ;
       ~MeasurementTrackerEventProducer() {}
 private:
-      virtual void produce(edm::Event&, const edm::EventSetup&);
+      virtual void produce(edm::Event&, const edm::EventSetup&) override;
 
 protected:
       void updatePixels( const edm::Event&, PxMeasurementDetSet & thePxDets, std::vector<bool> & pixelClustersToSkip ) const;

@@ -18,7 +18,7 @@
 // class declaration
 //
 
-class PFRecHitProducer : public edm::stream::EDProducer<> {
+class PFRecHitProducer final : public edm::stream::EDProducer<> {
    public:
       explicit PFRecHitProducer(const edm::ParameterSet& iConfig);
       ~PFRecHitProducer();

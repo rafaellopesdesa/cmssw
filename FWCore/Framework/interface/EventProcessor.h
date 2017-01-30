@@ -15,6 +15,7 @@ configured in the user's main() function, and is set running.
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "FWCore/Framework/interface/IEventProcessor.h"
 #include "FWCore/Framework/interface/InputSource.h"
+#include "FWCore/Framework/interface/PathsAndConsumesOfModules.h"
 #include "FWCore/Framework/src/PrincipalCache.h"
 #include "FWCore/Framework/src/SignallingProductRegistry.h"
 #include "FWCore/Framework/src/PreallocationConfiguration.h"
@@ -26,7 +27,8 @@ configured in the user's main() function, and is set running.
 #include "FWCore/ServiceRegistry/interface/ServiceLegacy.h"
 #include "FWCore/ServiceRegistry/interface/ServiceToken.h"
 
-#include "boost/shared_ptr.hpp"
+#include "FWCore/Utilities/interface/get_underlying_safe.h"
+
 #include "boost/thread/condition.hpp"
 
 #include <map>
@@ -34,6 +36,8 @@ configured in the user's main() function, and is set running.
 #include <set>
 #include <string>
 #include <vector>
+#include <mutex>
+#include <exception>
 
 namespace statemachine {
   class Machine;
@@ -44,6 +48,7 @@ namespace edm {
 
   class ExceptionToActionTable;
   class BranchIDListHelper;
+  class ThinnedAssociationsHelper;
   class EDLooperBase;
   class HistoryAppender;
   class ProcessDesc;
@@ -73,7 +78,7 @@ namespace edm {
                    std::vector<std::string> const& defaultServices,
                    std::vector<std::string> const& forcedServices = std::vector<std::string>());
 
-    EventProcessor(boost::shared_ptr<ProcessDesc>& processDesc,
+    EventProcessor(std::shared_ptr<ProcessDesc>& processDesc,
                    ServiceToken const& token,
                    serviceregistry::ServiceLegacy legacy);
 
@@ -111,6 +116,8 @@ namespace edm {
 
     std::vector<ModuleDescription const*>
     getAllModuleDescriptions() const;
+
+    ProcessConfiguration const& processConfiguration() const { return *processConfiguration_; }
 
     /// Return the number of events this EventProcessor has tried to process
     /// (inclues both successes and failures, including failures due
@@ -215,7 +222,7 @@ namespace edm {
     //
     // Now private functions.
     // init() is used by only by constructors
-    void init(boost::shared_ptr<ProcessDesc>& processDesc,
+    void init(std::shared_ptr<ProcessDesc>& processDesc,
               ServiceToken const& token,
               serviceregistry::ServiceLegacy);
 
@@ -224,11 +231,16 @@ namespace edm {
 
     void setupSignal();
 
-    bool hasSubProcess() const {
-      return subProcess_.get() != 0;
+    bool hasSubProcesses() const {
+      return subProcesses_.get() != nullptr && !subProcesses_->empty();
     }
 
     void possiblyContinueAfterForkChildFailure();
+    
+    friend class StreamProcessingTask;
+    void processEventsForStreamAsync(unsigned int iStreamIndex,
+                                     std::atomic<bool>* finishedProcessingEvents);
+    
     
     //read the next event using Stream iStreamIndex
     void readEvent(unsigned int iStreamIndex);
@@ -238,6 +250,15 @@ namespace edm {
 
     //returns true if an asynchronous stop was requested
     bool checkForAsyncStopRequest(StatusCode&);
+
+    std::shared_ptr<ProductRegistry const> preg() const {return get_underlying_safe(preg_);}
+    std::shared_ptr<ProductRegistry>& preg() {return get_underlying_safe(preg_);}
+    std::shared_ptr<BranchIDListHelper const> branchIDListHelper() const {return get_underlying_safe(branchIDListHelper_);}
+    std::shared_ptr<BranchIDListHelper>& branchIDListHelper() {return get_underlying_safe(branchIDListHelper_);}
+    std::shared_ptr<ThinnedAssociationsHelper const> thinnedAssociationsHelper() const {return get_underlying_safe(thinnedAssociationsHelper_);}
+    std::shared_ptr<ThinnedAssociationsHelper>& thinnedAssociationsHelper() {return get_underlying_safe(thinnedAssociationsHelper_);}
+    std::shared_ptr<EDLooperBase const> looper() const {return get_underlying_safe(looper_);}
+    std::shared_ptr<EDLooperBase>& looper() {return get_underlying_safe(looper_);}
     //------------------------------------------------------------------
     //
     // Data members below.
@@ -245,23 +266,30 @@ namespace edm {
     // only during construction, and never again. If they aren't
     // really needed, we should remove them.
 
-    boost::shared_ptr<ActivityRegistry>           actReg_;
-    boost::shared_ptr<ProductRegistry const>      preg_;
-    boost::shared_ptr<BranchIDListHelper>         branchIDListHelper_;
+    std::shared_ptr<ActivityRegistry> actReg_; // We do not use propagate_const because the registry itself is mutable.
+    edm::propagate_const<std::shared_ptr<ProductRegistry>> preg_;
+    edm::propagate_const<std::shared_ptr<BranchIDListHelper>> branchIDListHelper_;
+    edm::propagate_const<std::shared_ptr<ThinnedAssociationsHelper>> thinnedAssociationsHelper_;
     ServiceToken                                  serviceToken_;
-    std::unique_ptr<InputSource>                  input_;
-    std::unique_ptr<eventsetup::EventSetupsController> espController_;
-    boost::shared_ptr<eventsetup::EventSetupProvider> esp_;
+    edm::propagate_const<std::unique_ptr<InputSource>> input_;
+    edm::propagate_const<std::unique_ptr<eventsetup::EventSetupsController>> espController_;
+    edm::propagate_const<std::shared_ptr<eventsetup::EventSetupProvider>> esp_;
     std::unique_ptr<ExceptionToActionTable const>          act_table_;
-    boost::shared_ptr<ProcessConfiguration const>       processConfiguration_;
+    std::shared_ptr<ProcessConfiguration const>       processConfiguration_;
     ProcessContext                                processContext_;
-    std::auto_ptr<Schedule>                       schedule_;
-    std::auto_ptr<SubProcess>                     subProcess_;
-    std::unique_ptr<HistoryAppender>            historyAppender_;
+    PathsAndConsumesOfModules                     pathsAndConsumesOfModules_;
+    edm::propagate_const<std::unique_ptr<Schedule>> schedule_;
+    edm::propagate_const<std::unique_ptr<std::vector<SubProcess>>> subProcesses_;
+    edm::propagate_const<std::unique_ptr<HistoryAppender>> historyAppender_;
 
-    std::unique_ptr<FileBlock>                    fb_;
-    boost::shared_ptr<EDLooperBase>               looper_;
+    edm::propagate_const<std::unique_ptr<FileBlock>> fb_;
+    edm::propagate_const<std::shared_ptr<EDLooperBase>> looper_;
 
+    //The atomic protects concurrent access of deferredExceptionPtr_
+    std::atomic<bool>                             deferredExceptionPtrIsSet_;
+    std::exception_ptr                            deferredExceptionPtr_;
+    
+    std::mutex                                    nextTransitionMutex_;
     PrincipalCache                                principalCache_;
     bool                                          beginJobCalled_;
     bool                                          shouldWeStop_;

@@ -18,6 +18,7 @@
 #include "FWCore/Framework/interface/LuminosityBlock.h"
 #include "FWCore/Framework/interface/Run.h"
 #include "FWCore/Framework/src/edmodule_mightGet_config.h"
+#include "FWCore/Framework/src/EventSignalsSentry.h"
 
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
@@ -44,18 +45,36 @@ namespace edm {
     EDAnalyzerBase::~EDAnalyzerBase()
     {
     }
-    
+
+    void
+    EDAnalyzerBase::callWhenNewProductsRegistered(std::function<void(BranchDescription const&)> const& func) {
+      callWhenNewProductsRegistered_ = func;
+    }
+
     bool
-    EDAnalyzerBase::doEvent(EventPrincipal& ep, EventSetup const& c,
+    EDAnalyzerBase::doEvent(EventPrincipal const& ep, EventSetup const& c,
+                            ActivityRegistry* act,
                             ModuleCallingContext const* mcc) {
       Event e(ep, moduleDescription_, mcc);
       e.setConsumer(this);
-      this->analyze(e, c);
+      {
+        std::lock_guard<std::mutex> guard(mutex_);
+        std::lock_guard<SharedResourcesAcquirer> guardResources(resourcesAcquirer_);
+        e.setSharedResourcesAcquirer(&resourcesAcquirer_);
+        EventSignalsSentry sentry(act,mcc);
+        this->analyze(e, c);
+      }
       return true;
     }
     
+    SharedResourcesAcquirer EDAnalyzerBase::createAcquirer() {
+      return SharedResourcesAcquirer{};
+    }
+
     void
     EDAnalyzerBase::doBeginJob() {
+      resourcesAcquirer_ = createAcquirer();
+      
       this->beginJob();
     }
     
@@ -65,7 +84,7 @@ namespace edm {
     }
     
     void
-    EDAnalyzerBase::doBeginRun(RunPrincipal& rp, EventSetup const& c,
+    EDAnalyzerBase::doBeginRun(RunPrincipal const& rp, EventSetup const& c,
                                ModuleCallingContext const* mcc) {
       Run r(rp, moduleDescription_, mcc);
       r.setConsumer(this);
@@ -74,7 +93,7 @@ namespace edm {
     }
     
     void
-    EDAnalyzerBase::doEndRun(RunPrincipal& rp, EventSetup const& c,
+    EDAnalyzerBase::doEndRun(RunPrincipal const& rp, EventSetup const& c,
                              ModuleCallingContext const* mcc) {
       Run r(rp, moduleDescription_, mcc);
       r.setConsumer(this);
@@ -83,7 +102,7 @@ namespace edm {
     }
     
     void
-    EDAnalyzerBase::doBeginLuminosityBlock(LuminosityBlockPrincipal& lbp, EventSetup const& c,
+    EDAnalyzerBase::doBeginLuminosityBlock(LuminosityBlockPrincipal const& lbp, EventSetup const& c,
                                            ModuleCallingContext const* mcc) {
       LuminosityBlock lb(lbp, moduleDescription_, mcc);
       lb.setConsumer(this);
@@ -92,7 +111,7 @@ namespace edm {
     }
     
     void
-    EDAnalyzerBase::doEndLuminosityBlock(LuminosityBlockPrincipal& lbp, EventSetup const& c,
+    EDAnalyzerBase::doEndLuminosityBlock(LuminosityBlockPrincipal const& lbp, EventSetup const& c,
                                          ModuleCallingContext const* mcc) {
       LuminosityBlock lb(lbp, moduleDescription_, mcc);
       lb.setConsumer(this);
@@ -112,12 +131,12 @@ namespace edm {
     
     void
     EDAnalyzerBase::doPreForkReleaseResources() {
-      //preForkReleaseResources();
+      preForkReleaseResources();
     }
     
     void
     EDAnalyzerBase::doPostForkReacquireResources(unsigned int iChildIndex, unsigned int iNumberOfChildren) {
-      //postForkReacquireResources(iChildIndex, iNumberOfChildren);
+      postForkReacquireResources(iChildIndex, iNumberOfChildren);
     }
     
     void EDAnalyzerBase::doBeginRun_(Run const& rp, EventSetup const& c) {}

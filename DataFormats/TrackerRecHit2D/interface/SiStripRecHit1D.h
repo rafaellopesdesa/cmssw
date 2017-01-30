@@ -10,7 +10,7 @@
 #include "TkCloner.h"
 
 
-class SiStripRecHit1D GCC11_FINAL : public TrackerSingleRecHit { 
+class SiStripRecHit1D final : public TrackerSingleRecHit { 
 public:
 
  
@@ -25,26 +25,30 @@ public:
 		   CluRef const&  clus) : TrackerSingleRecHit(p,e,idet,clus){}
 
  
-  /// method to facilitate the convesion from 2D to 1D hits
-  SiStripRecHit1D(const SiStripRecHit2D*);
-
   ClusterRef cluster()  const { return cluster_strip() ; }
   void setClusterRef(ClusterRef const & ref)  {setClusterStripRef(ref);}
 
 
-  virtual SiStripRecHit1D * clone() const {return new SiStripRecHit1D( * this); }
+  virtual SiStripRecHit1D * clone() const override {return new SiStripRecHit1D( * this); }
+#ifndef __GCCXML__
+  virtual RecHitPointer cloneSH() const override { return std::make_shared<SiStripRecHit1D>(*this);}
+#endif
   
 
-  virtual int dimension() const {return 1;}
-  virtual void getKfComponents( KfComponentsHolder & holder ) const {getKfComponents1D(holder);}
+  virtual int dimension() const override {return 1;}
+  virtual void getKfComponents( KfComponentsHolder & holder ) const override {getKfComponents1D(holder);}
 
-  virtual bool canImproveWithTrack() const {return true;}
+  virtual bool canImproveWithTrack() const override {return true;}
 private:
   // double dispatch
-  virtual SiStripRecHit1D * clone(TkCloner const& cloner, TrajectoryStateOnSurface const& tsos) const {
-    return cloner(*this,tsos);
+  virtual SiStripRecHit1D * clone(TkCloner const& cloner, TrajectoryStateOnSurface const& tsos) const override {
+    return cloner(*this,tsos).release();
   }
- 
+#ifndef __GCCXML__
+  virtual  RecHitPointer cloneSH(TkCloner const& cloner, TrajectoryStateOnSurface const& tsos) const override {
+    return cloner.makeShared(*this,tsos);
+  }
+#endif 
 
  
 };

@@ -23,6 +23,13 @@ namespace fffnaming {
     return ss.str();
   }
 
+  inline std::string bolsFileName(const unsigned int run, const unsigned int ls) {
+    std::stringstream ss;
+    runLumiPrefixFill(ss,run,ls);
+    ss << "_BoLS.jsn";
+    return ss.str();
+  }
+
   inline std::string eorFileName(const unsigned int run) {
     std::stringstream ss;
     ss << "run" << std::setfill('0') << std::setw(6) << run << "_ls0000" << "_EoR.jsn";
@@ -79,6 +86,15 @@ namespace fffnaming {
     return ss.str();
   }
 
+  inline std::string streamerDataChecksumFileNameWithInstance(const unsigned int run, const unsigned int ls, std::string const& stream, std::string const& instance) {
+    std::stringstream ss;
+    runLumiPrefixFill(ss,run,ls);
+    ss << "_" << stream
+       << "_" << instance
+       << ".checksum";
+    return ss.str();
+  }
+
   inline std::string streamerJsonFileNameWithPid(const unsigned int run, const unsigned int ls, std::string const& stream) {
     std::stringstream ss;
     runLumiPrefixFill(ss,run,ls);
@@ -94,6 +110,42 @@ namespace fffnaming {
     ss << "_stream" << stream
        << "_" << instance
        << ".jsn";
+    return ss.str();
+  }
+
+  inline std::string protocolBufferHistogramFileNameWithPid(const unsigned int run, const unsigned int ls, std::string const& stream) {
+    std::stringstream ss;
+    runLumiPrefixFill(ss,run,ls);
+    ss << "_" << stream
+       << "_pid" << std::setfill('0') << std::setw(5) << getpid()
+       << ".pb";
+    return ss.str();
+  }
+
+  inline std::string protocolBufferHistogramFileNameWithInstance(const unsigned int run, const unsigned int ls, std::string const& stream, std::string const& instance) {
+    std::stringstream ss;
+    runLumiPrefixFill(ss,run,ls);
+    ss << "_" << stream
+       << "_" << instance
+       << ".pb";
+    return ss.str();
+  }
+
+  inline std::string rootHistogramFileNameWithPid(const unsigned int run, const unsigned int ls, std::string const& stream) {
+    std::stringstream ss;
+    runLumiPrefixFill(ss,run,ls);
+    ss << "_" << stream
+       << "_pid" << std::setfill('0') << std::setw(5) << getpid()
+       << ".root";
+    return ss.str();
+  }
+
+  inline std::string rootHistogramFileNameWithInstance(const unsigned int run, const unsigned int ls, std::string const& stream, std::string const& instance) {
+    std::stringstream ss;
+    runLumiPrefixFill(ss,run,ls);
+    ss << "_" << stream
+       << "_" << instance
+       << ".root";
     return ss.str();
   }
 

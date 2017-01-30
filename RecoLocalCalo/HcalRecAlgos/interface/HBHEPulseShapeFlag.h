@@ -18,7 +18,7 @@
 #include "DataFormats/HcalDigi/interface/HBHEDataFrame.h"
 #include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
 #include "DataFormats/HcalRecHit/interface/HBHERecHit.h"
-#include "RecoLocalCalo/HcalRecAlgos/interface/HcalCaloFlagLabels.h"
+#include "DataFormats/METReco/interface/HcalCaloFlagLabels.h"
 #include "CalibFormats/HcalObjects/interface/HcalCalibrations.h"
 #include "CalibFormats/HcalObjects/interface/HcalCoderDb.h"
 //---------------------------------------------------------------------------
@@ -31,6 +31,12 @@ public:
    HBHEPulseShapeFlagSetter();
    HBHEPulseShapeFlagSetter(double MinimumChargeThreshold,
              double TS4TS5ChargeThreshold,
+	     double TS3TS4ChargeThreshold,
+	     double TS3TS4UpperChargeThreshold,
+	     double TS5TS6ChargeThreshold,
+	     double TS5TS6UpperChargeThreshold,
+	     double R45PlusOneRange,
+	     double R45MinusOneRange,
 			    unsigned int TrianglePeakTS,
 			    const std::vector<double>& LinearThreshold, 
 			    const std::vector<double>& LinearCut,
@@ -56,6 +62,12 @@ public:
 private:
    double mMinimumChargeThreshold;
    double mTS4TS5ChargeThreshold;
+   double mTS3TS4UpperChargeThreshold;
+   double mTS5TS6UpperChargeThreshold;
+   double mTS3TS4ChargeThreshold;
+   double mTS5TS6ChargeThreshold;
+   double mR45PlusOneRange;
+   double mR45MinusOneRange;
    int mTrianglePeakTS;
    std::vector<double>  mCharge;  // stores charge for each TS in each digi
    // the pair is defined as (threshold, cut position)
@@ -73,12 +85,16 @@ private:
    TriangleFitResult PerformTriangleFit(const std::vector<double> &Charge);
    double PerformNominalFit(const std::vector<double> &Charge);
    double PerformDualNominalFit(const std::vector<double> &Charge);
-   double DualNominalFitSingleTry(const std::vector<double> &Charge, int Offset, int Distance);
+   double DualNominalFitSingleTry(const std::vector<double> &Charge, int Offset, int Distance, bool newCharges=true);
    double CalculateRMS8Max(const std::vector<double> &Charge);
    double PerformLinearFit(const std::vector<double> &Charge);
 private:
    bool CheckPassFilter(double Charge, double Discriminant, std::vector<std::pair<double, double> > &Cuts,
       int Side);
+   std::vector<double> f1_;
+   std::vector<double> f2_;
+   std::vector<double> errors_;
+
 };
 //---------------------------------------------------------------------------
 struct TriangleFitResult

@@ -49,8 +49,7 @@
 namespace edm
 {
   class ModuleCallingContext;
-  class ConsumesCollector;
- 
+  class ConsumesCollector; 
   class DataMixingSiStripMCDigiWorker
     {
     public:
@@ -59,7 +58,6 @@ namespace edm
 
      /** standard constructor*/
       explicit DataMixingSiStripMCDigiWorker(const edm::ParameterSet& ps, edm::ConsumesCollector && iC);
-
       /**Default destructor*/
       virtual ~DataMixingSiStripMCDigiWorker();
 
@@ -71,7 +69,7 @@ namespace edm
 
       virtual void initializeEvent(const edm::Event &e, edm::EventSetup const& iSetup);
 
-      void DMinitializeDetUnit(StripGeomDetUnit* det, const edm::EventSetup& iSetup );
+      void DMinitializeDetUnit(StripGeomDetUnit const * det, const edm::EventSetup& iSetup );
 
     private:
       // data specifiers
@@ -80,23 +78,58 @@ namespace edm
       edm::InputTag SiStripPileInputTag_ ;    // InputTag for pileup strips
       std::string SiStripDigiCollectionDM_  ; // secondary name to be given to new SiStrip digis
 
+      edm::InputTag SistripAPVLabelSig_;      // where to find vector of dead APVs
+      edm::InputTag SiStripAPVPileInputTag_;
+      std::string SistripAPVListDM_;          // output tag
+
+
       // 
 
+      typedef float Amplitude;
+      typedef std::pair<uint16_t, Amplitude> RawDigi;  // Replacement for SiStripDigi with pulse height instead of integer ADC
       typedef std::vector<SiStripDigi> OneDetectorMap;   // maps by strip ID for later combination - can have duplicate strips
+      typedef std::vector<RawDigi> OneDetectorRawMap;   // maps by strip ID for later combination - can have duplicate strips
       typedef std::map<uint32_t, OneDetectorMap> SiGlobalIndex; // map to all data for each detector ID
+      typedef std::map<uint32_t, OneDetectorRawMap> SiGlobalRawIndex; // map to all data for each detector ID
+
       typedef SiDigitalConverter::DigitalVecType DigitalVecType;
 
       SiGlobalIndex SiHitStorage_;
-
+      SiGlobalRawIndex SiRawDigis_;
 
       //      unsigned int eventId_; //=0 for signal, from 1-n for pileup events
+
+      // variables for temporary storage of mixed hits:
+
+
+      typedef std::map<int, Amplitude>  SignalMapType;
+      typedef std::map<uint32_t, SignalMapType>  signalMaps;
+
+      const SignalMapType* getSignal(uint32_t detID) const {
+	auto where = signals_.find(detID);
+	if(where == signals_.end()) {
+	  return 0;
+	}
+	return &where->second;
+      }
+
+      signalMaps signals_;
+
+      // to keep track of dead APVs from HIP interactions
+      typedef std::multimap< uint32_t, std::bitset<6> > APVMap;
+
+      APVMap theAffectedAPVmap_;
+
+      // for noise adding:
 
       std::string label_;
 
       std::string gainLabel;
+      bool SingleStripNoise;
       bool peakMode;
       double theThreshold;
       double theElectronPerADC;
+      bool APVSaturationFromHIP_;
       int theFedAlgo;
       std::string geometryType;
 
@@ -104,21 +137,27 @@ namespace edm
       std::unique_ptr<SiStripFedZeroSuppression> theSiZeroSuppress;
       std::unique_ptr<SiTrivialDigitalConverter> theSiDigitalConverter;
 
-
       edm::ESHandle<TrackerGeometry> pDD;
 
       // bad channels for each detector ID
       std::map<unsigned int, std::vector<bool> > allBadChannels;
+      // channels killed by HIP interactions for each detector ID
+      std::map<unsigned int, std::vector<bool> > allHIPChannels;
       // first and last channel wit signal for each detector ID
       std::map<unsigned int, size_t> firstChannelsWithSignal;
       std::map<unsigned int, size_t> lastChannelsWithSignal;
 
+      //----------------------------
 
       class StrictWeakOrdering{
       public:
 	bool operator() (SiStripDigi i,SiStripDigi j) const {return i.strip() < j.strip();}
       };
 
+      class StrictWeakRawOrdering{
+      public:
+	bool operator() (RawDigi i,RawDigi j) const {return i.first < j.first;}
+      };
 
     };
 }//edm

@@ -155,7 +155,7 @@ class HcalDetDiagPedestalMonitor : public HcalBaseDQMonitor {
     edm::EDGetTokenT<FEDRawDataCollection> tok_raw_;
     edm::EDGetTokenT<HcalTBTriggerData> tok_tb_;
 
-      void beginRun(const edm::Run& run, const edm::EventSetup& c) override;  
+      void bookHistograms(DQMStore::IBooker &ib, const edm::Run& run, const edm::EventSetup& c) override;  
       void endRun(const edm::Run& run, const edm::EventSetup& c) override;
       void beginLuminosityBlock(const edm::LuminosityBlock& lumiSeg,const edm::EventSetup& c) override ;
       void endLuminosityBlock(const edm::LuminosityBlock& lumiSeg,const edm::EventSetup& c) override;
@@ -240,9 +240,12 @@ class HcalDetDiagPedestalMonitor : public HcalBaseDQMonitor {
 
       std::map<unsigned int, int> KnownBadCells_;
 
+      // previously: statics in analyze
+      bool PEDseq_;
+      int  lastPEDorbit_,nChecksPED_;
 };
 
-HcalDetDiagPedestalMonitor::HcalDetDiagPedestalMonitor(const edm::ParameterSet& iConfig) {
+HcalDetDiagPedestalMonitor::HcalDetDiagPedestalMonitor(const edm::ParameterSet& iConfig): HcalBaseDQMonitor(iConfig) {
 
   ievt_=-1;
   emap=0;
@@ -282,22 +285,45 @@ HcalDetDiagPedestalMonitor::HcalDetDiagPedestalMonitor(const edm::ParameterSet& 
   // register for data access
   tok_hbhe_ = consumes<HBHEDigiCollection>(inputLabelDigi_);
   tok_ho_ = consumes<HODigiCollection>(inputLabelDigi_);
-   tok_hf_ = consumes<HFDigiCollection>(inputLabelDigi_);
+  tok_hf_ = consumes<HFDigiCollection>(inputLabelDigi_);
   tok_raw_ = consumes<FEDRawDataCollection>(iConfig.getUntrackedParameter<edm::InputTag>("rawDataLabel"));
   tok_tb_ = consumes<HcalTBTriggerData>(iConfig.getParameter<edm::InputTag>("hcalTBTriggerDataTag"));
 
+
+  ProblemCellsByDepth_missing=0;
+  ProblemCellsByDepth_unstable=0;
+  ProblemCellsByDepth_badped=0;
+  ProblemCellsByDepth_badrms=0;
+
+  ProblemCellsByDepth_missing_val=0;
+  ProblemCellsByDepth_unstable_val=0;
+  ProblemCellsByDepth_badped_val=0;
+  ProblemCellsByDepth_badrms_val=0;
+
 }
 
-HcalDetDiagPedestalMonitor::~HcalDetDiagPedestalMonitor(){}
+HcalDetDiagPedestalMonitor::~HcalDetDiagPedestalMonitor()
+{
 
-void HcalDetDiagPedestalMonitor::beginRun(const edm::Run& run, const edm::EventSetup& c){
+  if ( ProblemCellsByDepth_missing ) delete ProblemCellsByDepth_missing;
+  if ( ProblemCellsByDepth_unstable ) delete ProblemCellsByDepth_unstable;
+  if ( ProblemCellsByDepth_badped ) delete ProblemCellsByDepth_badped;
+  if ( ProblemCellsByDepth_badrms ) delete ProblemCellsByDepth_badrms;
+  if ( ProblemCellsByDepth_missing_val ) delete ProblemCellsByDepth_missing_val;
+  if ( ProblemCellsByDepth_unstable_val ) delete ProblemCellsByDepth_unstable_val;
+  if ( ProblemCellsByDepth_badped_val ) delete ProblemCellsByDepth_badped_val;
+  if ( ProblemCellsByDepth_badrms_val ) delete ProblemCellsByDepth_badrms_val;
+
+}
+
+void HcalDetDiagPedestalMonitor::bookHistograms(DQMStore::IBooker &ib, const edm::Run& run, const edm::EventSetup& c){
   edm::ESHandle<HcalDbService> conditions_;
   c.get<HcalDbRecord>().get(conditions_);
   emap=conditions_->getHcalMapping();
   
   edm::ESHandle<HcalChannelQuality> p;
-  c.get<HcalChannelQualityRcd>().get(p);
-  HcalChannelQuality* chanquality= new HcalChannelQuality(*p.product());
+  c.get<HcalChannelQualityRcd>().get("withTopo",p);
+  const HcalChannelQuality* chanquality= p.product();
   std::vector<DetId> mydetids = chanquality->getAllChannels();
   KnownBadCells_.clear();
 
@@ -311,80 +337,79 @@ void HcalDetDiagPedestalMonitor::beginRun(const edm::Run& run, const edm::EventS
   } 
  
 
-  HcalBaseDQMonitor::setup();
-  if (!dbe_) return;
+  HcalBaseDQMonitor::setup(ib);
   std::string name;
 
-  dbe_->setCurrentFolder(subdir_);   
-  meEVT_ = dbe_->bookInt("HcalDetDiagPedestalMonitor Event Number");
-  meRUN_ = dbe_->bookInt("HcalDetDiagPedestalMonitor Run Number");
+  ib.setCurrentFolder(subdir_);   
+  meEVT_ = ib.bookInt("HcalDetDiagPedestalMonitor Event Number");
+  meRUN_ = ib.bookInt("HcalDetDiagPedestalMonitor Run Number");
 
   ReferenceRun="UNKNOWN";
   LoadReference();
   LoadDataset();
-  dbe_->setCurrentFolder(subdir_);
-  RefRun_= dbe_->bookString("HcalDetDiagPedestalMonitor Reference Run",ReferenceRun);
+  ib.setCurrentFolder(subdir_);
+  RefRun_= ib.bookString("HcalDetDiagPedestalMonitor Reference Run",ReferenceRun);
   if(DatasetName.size()>0 && createHTMLonly){
      char str[200]; sprintf(str,"%sHcalDetDiagPedestalData_run%i_%i/",htmlOutputPath.c_str(),run_number,dataset_seq_number);
-     htmlFolder=dbe_->bookString("HcalDetDiagPedestalMonitor HTML folder",str);
+     htmlFolder=ib.bookString("HcalDetDiagPedestalMonitor HTML folder",str);
      MonitorElement *me;
-     dbe_->setCurrentFolder(prefixME_+"HcalInfo");
-     me=dbe_->bookInt("HBpresent");
+     ib.setCurrentFolder(prefixME_+"HcalInfo");
+     me=ib.bookInt("HBpresent");
      if(nHB>0) me->Fill(1);
-     me=dbe_->bookInt("HEpresent");
+     me=ib.bookInt("HEpresent");
      if(nHE>0) me->Fill(1);
-     me=dbe_->bookInt("HOpresent");
+     me=ib.bookInt("HOpresent");
      if(nHO>0) me->Fill(1);
-     me=dbe_->bookInt("HFpresent");
+     me=ib.bookInt("HFpresent");
      if(nHF>0) me->Fill(1);
   }
 
   ProblemCellsByDepth_missing = new EtaPhiHists();
-  ProblemCellsByDepth_missing->setup(dbe_," Problem Missing Channels");
+  ProblemCellsByDepth_missing->setup(ib," Problem Missing Channels");
   for(unsigned int i=0;i<ProblemCellsByDepth_missing->depth.size();i++)
           problemnames_.push_back(ProblemCellsByDepth_missing->depth[i]->getName());
   ProblemCellsByDepth_unstable = new EtaPhiHists();
-  ProblemCellsByDepth_unstable->setup(dbe_," Problem Unstable Channels");
+  ProblemCellsByDepth_unstable->setup(ib," Problem Unstable Channels");
   for(unsigned int i=0;i<ProblemCellsByDepth_unstable->depth.size();i++)
           problemnames_.push_back(ProblemCellsByDepth_unstable->depth[i]->getName());
   ProblemCellsByDepth_badped = new EtaPhiHists();
-  ProblemCellsByDepth_badped->setup(dbe_," Problem Bad Pedestal Value");
+  ProblemCellsByDepth_badped->setup(ib," Problem Bad Pedestal Value");
   for(unsigned int i=0;i<ProblemCellsByDepth_badped->depth.size();i++)
           problemnames_.push_back(ProblemCellsByDepth_badped->depth[i]->getName());
   ProblemCellsByDepth_badrms = new EtaPhiHists();
-  ProblemCellsByDepth_badrms->setup(dbe_," Problem Bad Rms Value");
+  ProblemCellsByDepth_badrms->setup(ib," Problem Bad Rms Value");
   for(unsigned int i=0;i<ProblemCellsByDepth_badrms->depth.size();i++)
           problemnames_.push_back(ProblemCellsByDepth_badrms->depth[i]->getName());
 
-  dbe_->setCurrentFolder(subdir_+"Summary Plots");
-  name="HB Pedestal Distribution (average over 4 caps)";           PedestalsAve4HB = dbe_->book1D(name,name,200,0,6);
-  name="HE Pedestal Distribution (average over 4 caps)";           PedestalsAve4HE = dbe_->book1D(name,name,200,0,6);
-  name="HO Pedestal Distribution (average over 4 caps)";           PedestalsAve4HO = dbe_->book1D(name,name,200,0,6);
-  name="HF Pedestal Distribution (average over 4 caps)";           PedestalsAve4HF = dbe_->book1D(name,name,200,0,6);
-  name="SIPM Pedestal Distribution (average over 4 caps)";         PedestalsAve4Simp = dbe_->book1D(name,name,200,5,15);
+  ib.setCurrentFolder(subdir_+"Summary Plots");
+  name="HB Pedestal Distribution (average over 4 caps)";           PedestalsAve4HB = ib.book1D(name,name,200,0,6);
+  name="HE Pedestal Distribution (average over 4 caps)";           PedestalsAve4HE = ib.book1D(name,name,200,0,6);
+  name="HO Pedestal Distribution (average over 4 caps)";           PedestalsAve4HO = ib.book1D(name,name,200,0,6);
+  name="HF Pedestal Distribution (average over 4 caps)";           PedestalsAve4HF = ib.book1D(name,name,200,0,6);
+  name="SIPM Pedestal Distribution (average over 4 caps)";         PedestalsAve4Simp = ib.book1D(name,name,200,5,15);
      
-  name="HB Pedestal-Reference Distribution (average over 4 caps)"; PedestalsAve4HBref= dbe_->book1D(name,name,1500,-3,3);
-  name="HE Pedestal-Reference Distribution (average over 4 caps)"; PedestalsAve4HEref= dbe_->book1D(name,name,1500,-3,3);
-  name="HO Pedestal-Reference Distribution (average over 4 caps)"; PedestalsAve4HOref= dbe_->book1D(name,name,1500,-3,3);
-  name="HF Pedestal-Reference Distribution (average over 4 caps)"; PedestalsAve4HFref= dbe_->book1D(name,name,1500,-3,3);
+  name="HB Pedestal-Reference Distribution (average over 4 caps)"; PedestalsAve4HBref= ib.book1D(name,name,1500,-3,3);
+  name="HE Pedestal-Reference Distribution (average over 4 caps)"; PedestalsAve4HEref= ib.book1D(name,name,1500,-3,3);
+  name="HO Pedestal-Reference Distribution (average over 4 caps)"; PedestalsAve4HOref= ib.book1D(name,name,1500,-3,3);
+  name="HF Pedestal-Reference Distribution (average over 4 caps)"; PedestalsAve4HFref= ib.book1D(name,name,1500,-3,3);
     
-  name="HB Pedestal RMS Distribution (individual cap)";            PedestalsRmsHB = dbe_->book1D(name,name,200,0,2);
-  name="HE Pedestal RMS Distribution (individual cap)";            PedestalsRmsHE = dbe_->book1D(name,name,200,0,2);
-  name="HO Pedestal RMS Distribution (individual cap)";            PedestalsRmsHO = dbe_->book1D(name,name,200,0,2);
-  name="HF Pedestal RMS Distribution (individual cap)";            PedestalsRmsHF = dbe_->book1D(name,name,200,0,2);
-  name="SIPM Pedestal RMS Distribution (individual cap)";          PedestalsRmsSimp = dbe_->book1D(name,name,200,0,4);
+  name="HB Pedestal RMS Distribution (individual cap)";            PedestalsRmsHB = ib.book1D(name,name,200,0,2);
+  name="HE Pedestal RMS Distribution (individual cap)";            PedestalsRmsHE = ib.book1D(name,name,200,0,2);
+  name="HO Pedestal RMS Distribution (individual cap)";            PedestalsRmsHO = ib.book1D(name,name,200,0,2);
+  name="HF Pedestal RMS Distribution (individual cap)";            PedestalsRmsHF = ib.book1D(name,name,200,0,2);
+  name="SIPM Pedestal RMS Distribution (individual cap)";          PedestalsRmsSimp = ib.book1D(name,name,200,0,4);
      
-  name="HB Pedestal_rms-Reference_rms Distribution";               PedestalsRmsHBref = dbe_->book1D(name,name,1500,-3,3);
-  name="HE Pedestal_rms-Reference_rms Distribution";               PedestalsRmsHEref = dbe_->book1D(name,name,1500,-3,3);
-  name="HO Pedestal_rms-Reference_rms Distribution";               PedestalsRmsHOref = dbe_->book1D(name,name,1500,-3,3);
-  name="HF Pedestal_rms-Reference_rms Distribution";               PedestalsRmsHFref = dbe_->book1D(name,name,1500,-3,3);
+  name="HB Pedestal_rms-Reference_rms Distribution";               PedestalsRmsHBref = ib.book1D(name,name,1500,-3,3);
+  name="HE Pedestal_rms-Reference_rms Distribution";               PedestalsRmsHEref = ib.book1D(name,name,1500,-3,3);
+  name="HO Pedestal_rms-Reference_rms Distribution";               PedestalsRmsHOref = ib.book1D(name,name,1500,-3,3);
+  name="HF Pedestal_rms-Reference_rms Distribution";               PedestalsRmsHFref = ib.book1D(name,name,1500,-3,3);
      
-  name="HBHEHF pedestal mean map";       Pedestals2DHBHEHF      = dbe_->book2D(name,name,87,-43,43,74,0,73);
-  name="HO pedestal mean map";           Pedestals2DHO          = dbe_->book2D(name,name,33,-16,16,74,0,73);
-  name="HBHEHF pedestal rms map";        Pedestals2DRmsHBHEHF   = dbe_->book2D(name,name,87,-43,43,74,0,73);
-  name="HO pedestal rms map";            Pedestals2DRmsHO       = dbe_->book2D(name,name,33,-16,16,74,0,73);
-  name="HBHEHF pedestal problems map";   Pedestals2DErrorHBHEHF = dbe_->book2D(name,name,87,-43,43,74,0,73);
-  name="HO pedestal problems map";       Pedestals2DErrorHO     = dbe_->book2D(name,name,33,-16,16,74,0,73);
+  name="HBHEHF pedestal mean map";       Pedestals2DHBHEHF      = ib.book2D(name,name,87,-43,43,74,0,73);
+  name="HO pedestal mean map";           Pedestals2DHO          = ib.book2D(name,name,33,-16,16,74,0,73);
+  name="HBHEHF pedestal rms map";        Pedestals2DRmsHBHEHF   = ib.book2D(name,name,87,-43,43,74,0,73);
+  name="HO pedestal rms map";            Pedestals2DRmsHO       = ib.book2D(name,name,33,-16,16,74,0,73);
+  name="HBHEHF pedestal problems map";   Pedestals2DErrorHBHEHF = ib.book2D(name,name,87,-43,43,74,0,73);
+  name="HO pedestal problems map";       Pedestals2DErrorHO     = ib.book2D(name,name,33,-16,16,74,0,73);
 
   Pedestals2DHBHEHF->setAxisRange(1,5,3);
   Pedestals2DHO->setAxisRange(1,5,3);
@@ -422,15 +447,15 @@ void HcalDetDiagPedestalMonitor::beginRun(const edm::Run& run, const edm::EventS
   PedestalsRmsHOref->setAxisTitle("ADC counts",1);
   PedestalsRmsHFref->setAxisTitle("ADC counts",1);
 
-  dbe_->setCurrentFolder(subdir_+"Plots for client");
+  ib.setCurrentFolder(subdir_+"Plots for client");
   ProblemCellsByDepth_missing_val = new EtaPhiHists();
-  ProblemCellsByDepth_missing_val->setup(dbe_," Missing channels");
+  ProblemCellsByDepth_missing_val->setup(ib," Missing channels");
   ProblemCellsByDepth_unstable_val = new EtaPhiHists();
-  ProblemCellsByDepth_unstable_val->setup(dbe_," Channel instability value");
+  ProblemCellsByDepth_unstable_val->setup(ib," Channel instability value");
   ProblemCellsByDepth_badped_val = new EtaPhiHists();
-  ProblemCellsByDepth_badped_val->setup(dbe_," Bad Pedestal-Ref Value");
+  ProblemCellsByDepth_badped_val->setup(ib," Bad Pedestal-Ref Value");
   ProblemCellsByDepth_badrms_val = new EtaPhiHists();
-  ProblemCellsByDepth_badrms_val->setup(dbe_," Bad Rms-ref Value");
+  ProblemCellsByDepth_badrms_val->setup(ib," Bad Rms-ref Value");
 }
 
 
@@ -439,9 +464,7 @@ void HcalDetDiagPedestalMonitor::analyze(const edm::Event& iEvent, const edm::Ev
  if(createHTMLonly) return;
   HcalBaseDQMonitor::analyze(iEvent, iSetup); // increments counters
 int  eta,phi,depth,nTS;
-static bool PEDseq;
-static int  lastPEDorbit,nChecksPED;
-   if(ievt_==-1){ ievt_=0; PEDseq=false; lastPEDorbit=-1;nChecksPED=0; }
+   if(ievt_==-1){ ievt_=0; PEDseq_=false; lastPEDorbit_=-1;nChecksPED_=0; }
    int orbit=iEvent.orbitNumber();
    meRUN_->Fill(iEvent.id().run());
 
@@ -458,12 +481,12 @@ static int  lastPEDorbit,nChecksPED;
   if(LocalRun && !PedestalEvent) return; 
 
   if(!LocalRun && Online_){
-      if(PEDseq && (orbit-lastPEDorbit)>(11223*10) && ievt_>500){
-         PEDseq=false;
+      if(PEDseq_ && (orbit-lastPEDorbit_)>(11223*10) && ievt_>500){
+         PEDseq_=false;
          fillHistos();
          CheckStatus();
-         nChecksPED++;
-         if(nChecksPED==1 || (nChecksPED>1 && ((nChecksPED-1)%12)==0)){
+         nChecksPED_++;
+         if(nChecksPED_==1 || (nChecksPED_>1 && ((nChecksPED_-1)%12)==0)){
              SaveReference();
          }
          for(int i=0;i<85;i++)for(int j=0;j<72;j++)for(int k=0;k<4;k++)for(int l=0;l<4;l++) hb_data[i][j][k][l].reset();
@@ -486,7 +509,7 @@ static int  lastPEDorbit,nChecksPED;
 	 if ( fedData.size() < 24 ) continue ;
 	 int value = ((const HcalDCCHeader*)(fedData.data()))->getCalibType() ;
 	 if ( calibType < 0 )  calibType = value ;
-         if(value==hc_Pedestal){   PEDseq=true;  lastPEDorbit=orbit; break;} 
+         if(value==hc_Pedestal){   PEDseq_=true;  lastPEDorbit_=orbit; break;} 
        }
    }
    if(!LocalRun && calibType!=hc_Pedestal) return; 
@@ -1026,6 +1049,7 @@ char   Subdet[10],str[500];
       }
       theFile->Write();
       theFile->Close();
+      theFile->Delete();
    }
 
    if(XmlFilePath.size()>0){
@@ -1222,6 +1246,7 @@ void HcalDetDiagPedestalMonitor::LoadReference(){
     }
   }
   f->Close();
+  f->Delete();
   IsReference=true;
 } 
 
@@ -1306,6 +1331,7 @@ void HcalDetDiagPedestalMonitor::LoadDataset(){
   if(STR3){ int ds; sscanf(STR3->String(),"%i",&ds); dataset_seq_number=ds;}
 
   f->Close();
+  f->Delete();
 } 
 void HcalDetDiagPedestalMonitor::beginLuminosityBlock(const edm::LuminosityBlock& lumiSeg,const edm::EventSetup& c){}
 void HcalDetDiagPedestalMonitor::endLuminosityBlock(const edm::LuminosityBlock& lumiSeg,const edm::EventSetup& c){}

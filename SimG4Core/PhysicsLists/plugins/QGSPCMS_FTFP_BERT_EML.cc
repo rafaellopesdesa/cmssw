@@ -17,8 +17,8 @@
 
 QGSPCMS_FTFP_BERT_EML::QGSPCMS_FTFP_BERT_EML(G4LogicalVolumeToDDLogicalPartMap& map, 
 			   const HepPDT::ParticleDataTable * table_,
-			   sim::FieldBuilder *fieldBuilder_, 
-			   const edm::ParameterSet & p) : PhysicsList(map, table_, fieldBuilder_, p) {
+			   sim::ChordFinderSetter *chordFinderSetter_, 
+			   const edm::ParameterSet & p) : PhysicsList(map, table_, chordFinderSetter_, p) {
 
   G4DataQuestionaire it(photon);
   
@@ -28,7 +28,7 @@ QGSPCMS_FTFP_BERT_EML::QGSPCMS_FTFP_BERT_EML(G4LogicalVolumeToDDLogicalPartMap& 
   bool tracking= p.getParameter<bool>("TrackingCut");
   double timeLimit = p.getParameter<double>("MaxTrackTime")*ns;
   edm::LogInfo("PhysicsList") << "You are using the simulation engine: "
-			      << "QGSP_FTFP_BERT_EML with Flags for EM Physics "
+			      << "QGSP_FTFP_BERT_EML \n Flags for EM Physics "
 			      << emPhys << ", for Hadronic Physics "
 			      << hadPhys << " and tracking cut " << tracking
 			      << "   t(ns)= " << timeLimit/ns;
@@ -38,7 +38,8 @@ QGSPCMS_FTFP_BERT_EML::QGSPCMS_FTFP_BERT_EML(G4LogicalVolumeToDDLogicalPartMap& 
     RegisterPhysics(new CMSEmStandardPhysics(ver));
 
     // Synchroton Radiation & GN Physics
-    RegisterPhysics(new G4EmExtraPhysics(ver));
+    G4EmExtraPhysics* gn = new G4EmExtraPhysics(ver);
+    RegisterPhysics(gn);
   }
 
   // Decays
@@ -68,6 +69,6 @@ QGSPCMS_FTFP_BERT_EML::QGSPCMS_FTFP_BERT_EML(G4LogicalVolumeToDDLogicalPartMap& 
   }
 
   // Monopoles
-  RegisterPhysics( new CMSMonopolePhysics(table_,fieldBuilder_,p));
+  RegisterPhysics( new CMSMonopolePhysics(table_,chordFinderSetter_,p));
 }
 

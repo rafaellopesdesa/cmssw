@@ -10,7 +10,7 @@
 */
 
 
-#include "FWCore/Framework/interface/EDProducer.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Utilities/interface/InputTag.h"
@@ -25,10 +25,10 @@
 #include "TrackingTools/PatternTools/interface/TrajectoryMeasurement.h"
 #include "CommonTools/Utils/interface/StringCutObjectSelector.h"
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
-#include "Geometry/Records/interface/IdealGeometryRecord.h"
+#include "Geometry/Records/interface/TrackerTopologyRcd.h"
 
 
-class MuonReSeeder : public edm::EDProducer {
+class MuonReSeeder : public edm::stream::EDProducer<> {
     public:
       explicit MuonReSeeder(const edm::ParameterSet & iConfig);
       virtual ~MuonReSeeder() { }
@@ -79,7 +79,7 @@ MuonReSeeder::produce(edm::Event & iEvent, const edm::EventSetup & iSetup) {
 
     //Retrieve tracker topology from geometry
     edm::ESHandle<TrackerTopology> tTopo;
-    iSetup.get<IdealGeometryRecord>().get(tTopo);
+    iSetup.get<TrackerTopologyRcd>().get(tTopo);
 
     auto_ptr<vector<TrajectorySeed> > out(new vector<TrajectorySeed>());
     unsigned int nsrc = src->size();

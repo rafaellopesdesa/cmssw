@@ -12,6 +12,7 @@
 RPCDigitizer::RPCDigitizer(const edm::ParameterSet& config) {
   theName = config.getParameter<std::string>("digiModel");
   theRPCSim = RPCSimFactory::get()->create(theName,config.getParameter<edm::ParameterSet>("digiModelConfig"));
+  theNoise=config.getParameter<bool>("doBkgNoise");
 }
 
 RPCDigitizer::~RPCDigitizer() {
@@ -42,8 +43,8 @@ void RPCDigitizer::doAction(MixCollection<PSimHit> & simHits,
   }
 
 
-  std::vector<RPCRoll*>  rpcRolls = theGeometry->rolls() ;
-  for(std::vector<RPCRoll*>::iterator r = rpcRolls.begin();
+  const std::vector<const RPCRoll*>&  rpcRolls = theGeometry->rolls() ;
+  for(auto r = rpcRolls.begin();
       r != rpcRolls.end(); r++){
 
     const edm::PSimHitContainer & rollSimHits = hitMap[(*r)->id()];
@@ -52,7 +53,9 @@ void RPCDigitizer::doAction(MixCollection<PSimHit> & simHits,
 //			     <<" hit(s) in the rpc roll";  
     
     theRPCSim->simulate(*r, rollSimHits, engine);
-    theRPCSim->simulateNoise(*r, engine);
+    if(theNoise){
+        theRPCSim->simulateNoise(*r, engine);
+    }
     theRPCSim->fillDigis((*r)->id(),rpcDigis);
     rpcDigiSimLink.insert(theRPCSim->rpcDigiSimLinks());
   }

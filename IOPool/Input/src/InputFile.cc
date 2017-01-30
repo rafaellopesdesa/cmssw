@@ -1,12 +1,17 @@
 /*----------------------------------------------------------------------
 Holder for an input TFile.
 ----------------------------------------------------------------------*/
+#include "TList.h"
+#include "TStreamerInfo.h"
+#include "TClass.h"
 #include "InputFile.h"
 
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
+#include "FWCore/Utilities/interface/ExceptionPropagate.h"
 #include "FWCore/Utilities/interface/TimeOfDay.h"
 
+#include <exception>
 #include <iomanip>
 
 namespace edm {
@@ -14,14 +19,20 @@ namespace edm {
     file_(), fileName_(fileName), reportToken_(0), inputType_(inputType) {
 
     logFileAction(msg, fileName);
-    file_.reset(TFile::Open(fileName));
+    file_ = std::unique_ptr<TFile>(TFile::Open(fileName)); // propagate_const<T> has no reset() function
+    std::exception_ptr e = edm::threadLocalException::getException();
+    if(e != std::exception_ptr()) {
+      edm::threadLocalException::setException(std::exception_ptr());
+      std::rethrow_exception(e);
+    }
     if(!file_) {
       return;
     }
     if(file_->IsZombie()) {
-      file_.reset();
+      file_ = nullptr; // propagate_const<T> has no reset() function
       return;
     }
+    
     logFileAction("  Successfully opened file ", fileName);
   }
 
@@ -70,7 +81,7 @@ namespace edm {
     Service<JobReport> reportSvc;
     reportSvc->reportSkippedFile(fileName, logicalFileName);
   }
- 
+
   void
   InputFile::reportFallbackAttempt(std::string const& pfn, std::string const& logicalFileName, std::string const& errorMessage) {
     Service<JobReport> reportSvc;

@@ -6,6 +6,8 @@
 #ifndef FACTORIZED_JET_CORRECTOR_H
 #define FACTORIZED_JET_CORRECTOR_H
 
+#include "CondFormats/Serialization/interface/Serializable.h"
+
 #include <vector>
 #include <string>
 #include "TLorentzVector.h"
@@ -37,6 +39,7 @@ class FactorizedJetCorrector
     void setLepPy       (float fLepPy);
     void setLepPz       (float fLepPz);
     void setAddLepToJet (bool fAddLepToJet);
+
     float getCorrection();
     std::vector<float> getSubCorrections();
     

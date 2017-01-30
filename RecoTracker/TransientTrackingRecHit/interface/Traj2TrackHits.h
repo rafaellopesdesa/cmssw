@@ -18,19 +18,19 @@
 class Traj2TrackHits {
 private:
   const StripClusterParameterEstimator * theCPE;
-  bool keepOrder;
-
+  bool keepOrder;  // FIXME move to enum
+  bool removeNoDet;  // true == as in conversion from TTRH tp TRH
 public:
 
-  explicit Traj2TrackHits(const TransientTrackingRecHitBuilder* builder,bool ikeepOrder) :
+  Traj2TrackHits(const TransientTrackingRecHitBuilder* builder, bool ikeepOrder, bool noNoDet=true) :
     theCPE(static_cast<TkTransientTrackingRecHitBuilder const *>(builder)->stripClusterParameterEstimator()),
-    keepOrder(ikeepOrder){}
+    keepOrder(ikeepOrder), removeNoDet(noNoDet) {}
 
   void operator()(Trajectory const & traj, TrackingRecHitCollection & hits, bool splitting) const {
     // ---  NOTA BENE: the convention is to sort hits and measurements "along the momentum".
     bool along = traj.direction() == alongMomentum;
     auto const & meas = traj.measurements();
-    hits.reserve(meas.size());
+    hits.reserve(splitting ? 2*meas.size() : meas.size());
     if(!splitting){
       if (keepOrder | along) copy(meas.begin(),meas.end(),hits);
       else copy(meas.rbegin(),meas.rend(),hits);
@@ -38,18 +38,20 @@ public:
     }
     if (keepOrder | along) split(meas.begin(),meas.end(),hits, along);
     else split(meas.rbegin(),meas.rend(),hits,along);
+    hits.shrink_to_fit();
   }
 
 private:
   template<typename HI>
-  static void copy(HI itm, HI e, TrackingRecHitCollection & hits) { 
-    for(;itm!=e;++itm) hits.push_back((*itm).recHit()->hit()->clone());
+  void copy(HI itm, HI e, TrackingRecHitCollection & hits) const { 
+    for(;itm!=e;++itm) if( (!removeNoDet) | ((*itm).recHitR().det()!=nullptr)) hits.push_back((*itm).recHitR().clone());
   }
 
   template<typename HI>
   void split(HI itm, HI e, TrackingRecHitCollection & hits, bool along) const { 
     for(;itm!=e;++itm) {
       auto const & hit = *(*itm).recHit()->hit();
+       if( (removeNoDet) & ((*itm).recHitR().det()==nullptr)) continue; 
       if(trackerHitRTTI::isUndef(hit) | ( hit.dimension()!=2) ) {
 	hits.push_back(hit.clone());
 	continue;

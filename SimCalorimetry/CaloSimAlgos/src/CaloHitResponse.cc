@@ -108,7 +108,6 @@ void CaloHitResponse::add( const PCaloHit& hit, CLHEP::HepRandomEngine* engine )
   if(theHitFilter == 0 || theHitFilter->accepts(hit)) {
     LogDebug("CaloHitResponse") << hit;
     CaloSamples signal( makeAnalogSignal( hit, engine ) ) ;
-
     bool keep ( keepBlank() ) ;  // here we  check for blank signal if not keeping them
     if( !keep )
     {
@@ -121,7 +120,7 @@ void CaloHitResponse::add( const PCaloHit& hit, CLHEP::HepRandomEngine* engine )
 	  }
        }
     }
-    LogDebug("CaloHitResponse") << signal;
+
     if( keep ) add(signal);
   }
 }
@@ -133,6 +132,7 @@ void CaloHitResponse::add(const CaloSamples & signal)
   CaloSamples * oldSignal = findSignal(id);
   if (oldSignal == 0) {
     theAnalogSignalMap[id] = signal;
+
   } else  {
     // need a "+=" to CaloSamples
     int sampleSize =  oldSignal->size();
@@ -150,7 +150,6 @@ CaloSamples CaloHitResponse::makeAnalogSignal(const PCaloHit & hit, CLHEP::HepRa
 
   DetId detId(hit.id());
   const CaloSimParameters & parameters = theParameterMap->simParameters(detId);
-  
   double signal = analogSignalAmplitude(detId, hit.energy(), parameters, engine);
 
   double time = hit.time();
@@ -203,8 +202,7 @@ double CaloHitResponse::analogSignalAmplitude(const DetId & detId, float energy,
   double npe = scl * energy * parameters.simHitToPhotoelectrons(detId);
   // do we need to doPoisson statistics for the photoelectrons?
   if(parameters.doPhotostatistics()) {
-    CLHEP::RandPoissonQ randPoissonQ(*engine, npe);
-    npe = randPoissonQ.fire();
+    npe = CLHEP::RandPoissonQ::shoot(engine,npe);
   }
   if(thePECorrection) npe = thePECorrection->correctPE(detId, npe, engine);
   return npe;

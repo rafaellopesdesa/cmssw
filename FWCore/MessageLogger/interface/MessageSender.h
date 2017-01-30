@@ -5,7 +5,7 @@
 #include "FWCore/MessageLogger/interface/ELseverityLevel.h"
 #include "FWCore/MessageLogger/interface/ErrorObj.h"
 
-#include "boost/shared_ptr.hpp"
+#include <memory>
 
 #include <map>
 
@@ -54,7 +54,7 @@ public:
   
 private:
   // data:
-  boost::shared_ptr<ErrorObj> errorobj_p;
+  std::shared_ptr<ErrorObj> errorobj_p;
 
 };  // MessageSender
 

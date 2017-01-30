@@ -1,10 +1,12 @@
-#include "CondFormats/HcalObjects/interface/HcalCondObjectContainer.h"
+#include "CondFormats/HcalObjects/src/headers.h"
 
-#include "CondFormats/HcalObjects/interface/AllObjects.h"
 
 namespace CondFormats_HcalObjects {
   struct dictionary {
 
+    HcalZDCLowGainFractions myfracs();
+    std::vector<HcalZDCLowGainFraction> myfracsVec;
+    
     HcalPedestals mypeds();
     std::vector<HcalPedestal> mypedsVec;
  
@@ -22,6 +24,9 @@ namespace CondFormats_HcalObjects {
  
     HcalCalibrationQIEData mycalqie();
     std::vector<HcalCalibrationQIECoder> mycalqieVec;
+
+    HcalQIETypes myqietype();
+    std::vector<HcalQIEType> myqietypevec;
  
     HcalElectronicsMap mymap;
     std::vector<HcalElectronicsMap::PrecisionItem> mymap2;
@@ -83,6 +88,27 @@ namespace CondFormats_HcalObjects {
 
     HcalTimingParams myTimingParams;
     std::vector<HcalTimingParam> myTimingParamVec;
+
+    // OOT pileup correction objects
+    std::map<std::string, AbsOOTPileupCorrection*> myInnerMap;
+    std::map<std::string, std::map<std::string, AbsOOTPileupCorrection*> > myOuterMap;
+    ScalingExponential myScalingExponential;
+    PiecewiseScalingPolynomial myPiecewiseScalingPolynomial;
+    OOTPileupCorrDataFcn myOOTPileupCorrDataFcn;
+    OOTPileupCorrData myOOTPileupCorrData;
+    DummyOOTPileupCorrection myDummyOOTPileupCorrection;
+    OOTPileupCorrectionMapColl myOOTPileupCorrectionMapColl;
+    OOTPileupCorrectionBuffer myOOTPileupCorrectionBuffer;
+
+    // QIE8 input pulse representation objects
+    HcalInterpolatedPulse myHcalInterpolatedPulse;
+    std::vector<HcalInterpolatedPulse> myHcalInterpolatedPulseVec;
+    HBHEChannelGroups myHBHEChannelGroups;
+    HcalInterpolatedPulseColl myHcalInterpolatedPulseColl;
+
+    // HBHE negative energy filter
+    std::vector<PiecewiseScalingPolynomial> myPiecewiseScalingPolynomialVec;
+    HBHENegativeEFilter myHBHENegativeEFilter;
   };
 }
 

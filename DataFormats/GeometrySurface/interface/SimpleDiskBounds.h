@@ -10,7 +10,7 @@
  * Plane bounds that define a disk with a concentric hole in the middle.
  */
 
-class SimpleDiskBounds GCC11_FINAL : public Bounds {
+class SimpleDiskBounds final : public Bounds {
 public:
 
   /// Construct the bounds from min and max R and Z in LOCAL coordinates.
@@ -24,6 +24,8 @@ public:
     return  ((p.z() > theZmin) & (p.z() < theZmax)) &&
     ( (p.perp2() > theRmin*theRmin) & (p.perp2() < theRmax*theRmax) );
   }
+
+  using Bounds::inside;
     
   virtual bool inside( const Local3DPoint& p, const LocalError& err, float scale) const;
 

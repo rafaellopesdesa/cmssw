@@ -18,6 +18,7 @@
   </class>
 
   <class name="QGLikelihoodCategory"/>
+  <class name="QGLikelihoodParameters"/>
   <class name="QGLikelihoodObject" class_version="0">
      <field name="data" mapping="blob"/>
   </class>
@@ -25,7 +26,21 @@
   <class name="QGLikelihoodObject::Entry"/>
   <class name="std::vector<QGLikelihoodObject::Entry>"/>     
 
+  <class name="QGLikelihoodSystematicsObject" class_version="0">
+     <field name="data" mapping="blob"/>
+  </class>
 
+  <class name="QGLikelihoodSystematicsObject::Entry"/>
+  <class name="std::vector<QGLikelihoodSystematicsObject::Entry>"/>     
+
+  <class name="METCorrectorParameters"/>
+
+  <class name="JME::JetResolutionObject"/>
+  <class name="JME::JetResolutionObject::Definition"/>
+  <class name="JME::JetResolutionObject::Record"/>
+  <class name="JME::JetResolutionObject::Range"/>
+  <class name="std::vector<JME::JetResolutionObject::Record>"/>
+  <class name="std::vector<JME::JetResolutionObject::Range>"/>
 
 </selection>
 </lcgdict>

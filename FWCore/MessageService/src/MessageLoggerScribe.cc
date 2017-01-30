@@ -211,7 +211,7 @@ namespace edm {
 namespace service {
 
 
-MessageLoggerScribe::MessageLoggerScribe(boost::shared_ptr<ThreadQueue> queue)
+MessageLoggerScribe::MessageLoggerScribe(std::shared_ptr<ThreadQueue> queue)
 : admin_p   ( new ELadministrator() )
 , early_dest( admin_p->attach(ELoutput(std::cerr, false)) )
 , file_ps   ( )
@@ -302,14 +302,14 @@ void
     }
     case MessageLoggerQ::CONFIGURE:  {			// changelog 17
       if (singleThread) {
-	job_pset_p.reset(static_cast<ParameterSet *>(operand));
+        job_pset_p = std::shared_ptr<PSet>(static_cast<PSet*>(operand)); // propagate_const<T> has no reset() function
 	configure_errorlog();
 	break;
       } else {
 	ConfigurationHandshake * h_p = 
 		static_cast<ConfigurationHandshake *>(operand);
-	job_pset_p.reset(static_cast<ParameterSet *>(h_p->p));
-	boost::mutex::scoped_lock sl(h_p->m);   // get lock
+        job_pset_p = std::shared_ptr<PSet>(static_cast<PSet*>(h_p->p)); // propagate_const<T> has no reset() function
+  std::lock_guard<std::mutex> sl(h_p->m);   // get lock
 	try {
 	  configure_errorlog();
 	}
@@ -317,7 +317,7 @@ void
 	  {
 	    Place_for_passing_exception_ptr epp = h_p->epp;
 	    if (!(*epp)) { 
-	      *epp = boost::shared_ptr<edm::Exception>(new edm::Exception(e));
+	      *epp = std::make_shared<edm::Exception>(e);
 	    } else {
 	      Pointer_to_new_exception_on_heap ep = *epp;
 	      (*ep) << "\n and another exception: \n" << e.what();
@@ -397,8 +397,8 @@ void
       if (singleThread) return;
       ConfigurationHandshake * h_p = 
 	      static_cast<ConfigurationHandshake *>(operand);
-      job_pset_p.reset(static_cast<ParameterSet *>(h_p->p));
-      boost::mutex::scoped_lock sl(h_p->m);   // get lock
+      job_pset_p = std::shared_ptr<PSet>(static_cast<PSet*>(h_p->p)); // propagate_const<T> has no reset() function
+      std::lock_guard<std::mutex> sl(h_p->m);   // get lock
       h_p->c.notify_all();  // Signal to MessageLoggerQ that we are done
       // finally, release the scoped lock by letting it go out of scope 
       break;
@@ -419,7 +419,7 @@ void
       } else {
 	ConfigurationHandshake * h_p = 
 		static_cast<ConfigurationHandshake *>(operand);
-	boost::mutex::scoped_lock sl(h_p->m);   // get lock
+    std::lock_guard<std::mutex> sl(h_p->m);   // get lock
 	std::map<std::string, double> * smp = 
 		static_cast<std::map<std::string, double> *>(h_p->p);
 	triggerFJRmessageSummary(*smp);
@@ -844,7 +844,7 @@ void
       stream_ps["cerr"] = &std::cerr;
     }
     else  {
-      boost::shared_ptr<std::ofstream> os_sp(new std::ofstream(actual_filename.c_str()));
+      auto os_sp = std::make_shared<std::ofstream>(actual_filename.c_str());
       file_ps.push_back(os_sp);
       dest_ctrl = admin_p->attach( ELoutput(*os_sp) );
       stream_ps[actual_filename] = os_sp.get();
@@ -969,7 +969,7 @@ void
       } else if ( actual_filename == "cerr" ) {
         os_p = &std::cerr;
       } else {
-        boost::shared_ptr<std::ofstream> os_sp(new std::ofstream(actual_filename.c_str()));
+        auto os_sp = std::make_shared<std::ofstream>(actual_filename.c_str());
 	file_ps.push_back(os_sp);
         os_p = os_sp.get();
       }
@@ -1009,17 +1009,14 @@ void
     return;
   }
 
-  for( std::vector<NamedDestination*>::const_iterator it = extern_dests.begin()
-     ; it != extern_dests.end()
-     ;  ++it
-     )
+  for( auto& dest : extern_dests)
   {
-    ELdestination *  dest_p = (*it)->dest_p().get();
+    ELdestination *  dest_p = dest->dest_p().get();
     ELdestControl  dest_ctrl = admin_p->attach( *dest_p );
 
     // configure the newly-attached destination:
-    configure_dest( dest_ctrl, (*it)->name() );
-    delete *it;  // dispose of our (copy of the) NamedDestination
+    configure_dest( dest_ctrl, dest->name() );
+    delete dest;  // dispose of our (copy of the) NamedDestination
   }
   extern_dests.clear();
  

@@ -48,7 +48,10 @@ namespace reco {
   public:
 
     typedef std::vector<std::pair<CaloClusterPtr::key_type,edm::Ptr<PFCluster> > > EEtoPSAssociation;
-    typedef ROOT::Math::PositionVector3D<ROOT::Math::CylindricalEta3D<Double32_t> > REPPoint;
+    // Next typedef uses double in ROOT 6 rather than Double32_t due to a bug in ROOT 5,
+    // which otherwise would make ROOT5 files unreadable in ROOT6.  This does not increase
+    // the size on disk, because due to the bug, double was actually stored on disk in ROOT 5.
+    typedef ROOT::Math::PositionVector3D<ROOT::Math::CylindricalEta3D<double> > REPPoint;
   
     PFCluster() : CaloCluster(CaloCluster::particleFlow), time_(-99.0), layer_(PFLayer::NONE), color_(1) {}
 
@@ -80,11 +83,14 @@ namespace reco {
 
     /// cluster time
     double        time() const {return time_;}
+    /// cluster depth
+    double        depth() const {return depth_;}
 
     void         setTime(double time) {time_ = time;}
+    void         setDepth(double depth) {depth_ = depth;}
     
     /// cluster position: rho, eta, phi
-    const REPPoint&       positionREP() const {return posrep_;}
+    const REPPoint& positionREP() const {return posrep_;}
     
     /// computes posrep_ once and for all
     void calculatePositionREP() {
@@ -148,16 +154,20 @@ namespace reco {
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__REFLEX__)
     template<typename pruner>
-      void pruneUsing(pruner prune) {
-      hitsAndFractions_.clear();
-      std::vector<reco::PFRecHitFraction>::iterator iter = 
-	std::stable_partition(rechits_.begin(),rechits_.end(),prune);
-      rechits_.erase(iter,rechits_.end());
-      hitsAndFractions_.reserve(rechits_.size());
-      for( const auto& hitfrac : rechits_ ) {
-	hitsAndFractions_.emplace_back(hitfrac.recHitRef()->detId(),
-				       hitfrac.fraction());
+    void pruneUsing(pruner prune) {
+      // remove_if+erase algo applied to both vectors...
+      auto iter = std::find_if_not(rechits_.begin(),rechits_.end(),prune);
+      if (iter==rechits_.end()) return;
+      auto first = iter-rechits_.begin();
+      for (auto i=first; ++i<int(rechits_.size());) {
+          if (prune(rechits_[i])) {
+            rechits_[first] = std::move(rechits_[i]);
+            hitsAndFractions_[first] = std::move(hitsAndFractions_[i]);
+            ++first;
+          }    
       }
+      rechits_.erase(rechits_.begin()+first,rechits_.end());
+      hitsAndFractions_.erase(hitsAndFractions_.begin()+first,hitsAndFractions_.end());
     }
 #endif
     
@@ -169,8 +179,9 @@ namespace reco {
     /// cluster position: rho, eta, phi (transient)
     REPPoint            posrep_;
 
-    ///Michalis :Add timing information
+    ///Michalis :Add timing and depth information
     double time_;
+    double depth_;
 
     /// transient layer
     PFLayer::Layer layer_; 

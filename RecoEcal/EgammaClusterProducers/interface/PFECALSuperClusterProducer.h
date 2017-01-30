@@ -25,6 +25,7 @@
 #include "Geometry/CaloTopology/interface/CaloTopology.h" 
 
 #include "DataFormats/ParticleFlowReco/interface/PFCluster.h"
+#include "RecoEcal/EgammaCoreTools/interface/EcalClusterTools.h"
 
 /**\class PFECALSuperClusterProducer 
 
@@ -38,17 +39,16 @@ class CaloSubdetectorGeometry;
 class DetId;
 class GBRForest;
 class GBRWrapperRcd;
-class EcalClusterTools;
-
 
 class PFECALSuperClusterProducer : public edm::stream::EDProducer<> {
  public:  
   explicit PFECALSuperClusterProducer(const edm::ParameterSet&);
   ~PFECALSuperClusterProducer();
 
-  virtual void beginLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&);
-  virtual void produce(edm::Event&, const edm::EventSetup&);
+  virtual void beginLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&) override;
+  virtual void produce(edm::Event&, const edm::EventSetup&) override;
   
+  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions); 
 
  private:  
   // ----------member data ---------------------------

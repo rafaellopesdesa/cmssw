@@ -3,19 +3,16 @@ import FWCore.ParameterSet.Config as cms
 ###############################################################
 # Large impact parameter Tracking using mixed-triplet seeding #
 ###############################################################
-
-mixedTripletStepClusters = cms.EDProducer("TrackClusterRemover",
-    clusterLessSolution = cms.bool(True),
-    oldClusterRemovalInfo = cms.InputTag("detachedTripletStepClusters"),
-    trajectories = cms.InputTag("detachedTripletStepTracks"),
-    overrideTrkQuals = cms.InputTag('detachedTripletStep'),
-    TrackQuality = cms.string('highPurity'),
+from RecoLocalTracker.SubCollectionProducers.trackClusterRemover_cfi import *
+mixedTripletStepClusters = trackClusterRemover.clone(
+    maxChi2                                  = cms.double(9.0),
+    trajectories                             = cms.InputTag("detachedTripletStepTracks"),
+    pixelClusters                            = cms.InputTag("siPixelClusters"),
+    stripClusters                            = cms.InputTag("siStripClusters"),
+    oldClusterRemovalInfo                    = cms.InputTag("detachedTripletStepClusters"),
+    overrideTrkQuals                         = cms.InputTag('detachedTripletStep'),
+    TrackQuality                             = cms.string('highPurity'),
     minNumberOfLayersWithMeasBeforeFiltering = cms.int32(0),
-    pixelClusters = cms.InputTag("siPixelClusters"),
-    stripClusters = cms.InputTag("siStripClusters"),
-    Common = cms.PSet(
-        maxChi2 = cms.double(9.0)
-    )
 )
 
 # SEEDING LAYERS
@@ -28,19 +25,19 @@ mixedTripletStepSeedLayersA = cms.EDProducer("SeedingLayersEDProducer",
         'FPix1_pos+FPix2_pos+TEC2_pos', 'FPix1_neg+FPix2_neg+TEC2_neg',
         'FPix2_pos+TEC2_pos+TEC3_pos', 'FPix2_neg+TEC2_neg+TEC3_neg'),
     BPix = cms.PSet(
-        TTRHBuilder = cms.string('TTRHBuilderWithoutAngle4MixedTriplets'),
+        TTRHBuilder = cms.string('WithTrackAngle'),
         HitProducer = cms.string('siPixelRecHits'),
         skipClusters = cms.InputTag('mixedTripletStepClusters')
     ),
     FPix = cms.PSet(
-        TTRHBuilder = cms.string('TTRHBuilderWithoutAngle4MixedTriplets'),
+        TTRHBuilder = cms.string('WithTrackAngle'),
         HitProducer = cms.string('siPixelRecHits'),
         skipClusters = cms.InputTag('mixedTripletStepClusters')
     ),
     TEC = cms.PSet(
         matchedRecHits = cms.InputTag("siStripMatchedRecHits","matchedRecHit"),
         useRingSlector = cms.bool(True),
-        TTRHBuilder = cms.string('WithTrackAngle'),
+        TTRHBuilder = cms.string('WithTrackAngle'), clusterChargeCut = cms.PSet(refToPSet_ = cms.string('SiStripClusterChargeCutTight')),
         minRing = cms.int32(1),
         maxRing = cms.int32(1),
         skipClusters = cms.InputTag('mixedTripletStepClusters')
@@ -64,13 +61,13 @@ mixedTripletStepSeedsA.RegionFactoryPSet.RegionPSet.originRadius = 1.5
 mixedTripletStepSeedLayersB = cms.EDProducer("SeedingLayersEDProducer",
     layerList = cms.vstring('BPix2+BPix3+TIB1', 'BPix2+BPix3+TIB2'),
     BPix = cms.PSet(
-        TTRHBuilder = cms.string('TTRHBuilderWithoutAngle4MixedTriplets'),
+        TTRHBuilder = cms.string('WithTrackAngle'),
         HitProducer = cms.string('siPixelRecHits'),
         skipClusters = cms.InputTag('mixedTripletStepClusters')
     ),
     TIB = cms.PSet(
         matchedRecHits = cms.InputTag("siStripMatchedRecHits","matchedRecHit"),
-        TTRHBuilder = cms.string('WithTrackAngle'),
+        TTRHBuilder = cms.string('WithTrackAngle'), clusterChargeCut = cms.PSet(refToPSet_ = cms.string('SiStripClusterChargeCutTight')),
         skipClusters = cms.InputTag('mixedTripletStepClusters')
     )
 )
@@ -93,7 +90,8 @@ mixedTripletStepSeedsB.SeedComparitorPSet = cms.PSet(
         FilterAtHelixStage = cms.bool(False),
         FilterPixelHits = cms.bool(True),
         FilterStripHits = cms.bool(True),
-        ClusterShapeHitFilterName = cms.string('ClusterShapeHitFilter')
+        ClusterShapeHitFilterName = cms.string('ClusterShapeHitFilter'),
+        ClusterShapeCacheSrc = cms.InputTag('siPixelClusterShapeCache')
     )
 
 import RecoTracker.TkSeedGenerator.GlobalCombinedSeeds_cfi
@@ -104,14 +102,11 @@ mixedTripletStepSeeds.seedCollections = cms.VInputTag(
         )
 
 # QUALITY CUTS DURING TRACK BUILDING
-import TrackingTools.TrajectoryFiltering.TrajectoryFilterESProducer_cfi
-mixedTripletStepTrajectoryFilter = TrackingTools.TrajectoryFiltering.TrajectoryFilterESProducer_cfi.trajectoryFilterESProducer.clone(
-    ComponentName = 'mixedTripletStepTrajectoryFilter',
-    filterPset = TrackingTools.TrajectoryFiltering.TrajectoryFilterESProducer_cfi.trajectoryFilterESProducer.filterPset.clone(
+import TrackingTools.TrajectoryFiltering.TrajectoryFilter_cff
+mixedTripletStepTrajectoryFilter = TrackingTools.TrajectoryFiltering.TrajectoryFilter_cff.CkfBaseTrajectoryFilter_block.clone(
     maxLostHits = 0,
     minimumNumberOfHits = 3,
     minPt = 0.05
-    )
     )
 
 # Propagator taking into account momentum uncertainty in multiple scattering calculation.
@@ -126,19 +121,18 @@ mixedTripletStepPropagatorOpposite = TrackingTools.MaterialEffects.OppositeMater
     ptMin = 0.05
     )
 
-import TrackingTools.KalmanUpdators.Chi2MeasurementEstimatorESProducer_cfi
-mixedTripletStepChi2Est = TrackingTools.KalmanUpdators.Chi2MeasurementEstimatorESProducer_cfi.Chi2MeasurementEstimator.clone(
+import TrackingTools.KalmanUpdators.Chi2MeasurementEstimator_cfi
+mixedTripletStepChi2Est = TrackingTools.KalmanUpdators.Chi2MeasurementEstimator_cfi.Chi2MeasurementEstimator.clone(
     ComponentName = cms.string('mixedTripletStepChi2Est'),
     nSigma = cms.double(3.0),
     MaxChi2 = cms.double(25.0)
 )
 
 # TRACK BUILDING
-import RecoTracker.CkfPattern.GroupedCkfTrajectoryBuilderESProducer_cfi
-mixedTripletStepTrajectoryBuilder = RecoTracker.CkfPattern.GroupedCkfTrajectoryBuilderESProducer_cfi.GroupedCkfTrajectoryBuilder.clone(
-    ComponentName = 'mixedTripletStepTrajectoryBuilder',
+import RecoTracker.CkfPattern.GroupedCkfTrajectoryBuilder_cfi
+mixedTripletStepTrajectoryBuilder = RecoTracker.CkfPattern.GroupedCkfTrajectoryBuilder_cfi.GroupedCkfTrajectoryBuilder.clone(
     MeasurementTrackerName = '',
-    trajectoryFilterName = 'mixedTripletStepTrajectoryFilter',
+    trajectoryFilter = cms.PSet(refToPSet_ = cms.string('mixedTripletStepTrajectoryFilter')),
     propagatorAlong = cms.string('mixedTripletStepPropagator'),
     propagatorOpposite = cms.string('mixedTripletStepPropagatorOpposite'),
     clustersToSkip = cms.InputTag('mixedTripletStepClusters'),
@@ -155,7 +149,7 @@ mixedTripletStepTrackCandidates = RecoTracker.CkfPattern.CkfTrackCandidates_cfi.
     ### these two parameters are relevant only for the CachingSeedCleanerBySharedInput
     numHitsForSeedCleaner = cms.int32(50),
     #onlyPixelHitsForSeedCleaner = cms.bool(True),
-    TrajectoryBuilder = 'mixedTripletStepTrajectoryBuilder',
+    TrajectoryBuilderPSet = cms.PSet(refToPSet_ = cms.string('mixedTripletStepTrajectoryBuilder')),
     doSeedingRegionRebuilding = True,
     useHitsSplitting = True
 )
@@ -172,7 +166,7 @@ mixedTripletStepTrackCandidates.TrajectoryCleaner = 'mixedTripletStepTrajectoryC
 # TRACK FITTING
 import RecoTracker.TrackProducer.TrackProducer_cfi
 mixedTripletStepTracks = RecoTracker.TrackProducer.TrackProducer_cfi.TrackProducer.clone(
-    AlgorithmName = cms.string('iter4'),
+    AlgorithmName = cms.string('mixedTripletStep'),
     src = 'mixedTripletStepTrackCandidates',
     Fitter = cms.string('FlexibleKFFittingSmoother')
 )

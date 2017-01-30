@@ -1,22 +1,26 @@
 import FWCore.ParameterSet.Config as cms
+from Configuration.StandardSequences.Eras import eras
 
 mixSimHits = cms.PSet(
-    input = cms.VInputTag(cms.InputTag("g4SimHits","BSCHits"), cms.InputTag("g4SimHits","BCM1FHits"), cms.InputTag("g4SimHits","PLTHits"), cms.InputTag("g4SimHits","FP420SI"), cms.InputTag("g4SimHits","MuonCSCHits"), cms.InputTag("g4SimHits","MuonDTHits"), cms.InputTag("g4SimHits","MuonRPCHits"), 
-        cms.InputTag("g4SimHits","TotemHitsRP"), cms.InputTag("g4SimHits","TotemHitsT1"), cms.InputTag("g4SimHits","TotemHitsT2Gem"), cms.InputTag("g4SimHits","TrackerHitsPixelBarrelHighTof"), cms.InputTag("g4SimHits","TrackerHitsPixelBarrelLowTof"), 
+    input = cms.VInputTag(  # note that this list needs to be in the same order as the subdets
+        #cms.InputTag("g4SimHits","BSCHits"), cms.InputTag("g4SimHits","BCM1FHits"), cms.InputTag("g4SimHits","PLTHits"), cms.InputTag("g4SimHits","FP420SI"),
+        cms.InputTag("g4SimHits","MuonCSCHits"), cms.InputTag("g4SimHits","MuonDTHits"), cms.InputTag("g4SimHits","MuonRPCHits"), 
+        #cms.InputTag("g4SimHits","TotemHitsRP"), cms.InputTag("g4SimHits","TotemHitsT1"), cms.InputTag("g4SimHits","TotemHitsT2Gem"),
+        cms.InputTag("g4SimHits","TrackerHitsPixelBarrelHighTof"), cms.InputTag("g4SimHits","TrackerHitsPixelBarrelLowTof"), 
         cms.InputTag("g4SimHits","TrackerHitsPixelEndcapHighTof"), cms.InputTag("g4SimHits","TrackerHitsPixelEndcapLowTof"), cms.InputTag("g4SimHits","TrackerHitsTECHighTof"), cms.InputTag("g4SimHits","TrackerHitsTECLowTof"), cms.InputTag("g4SimHits","TrackerHitsTIBHighTof"), 
         cms.InputTag("g4SimHits","TrackerHitsTIBLowTof"), cms.InputTag("g4SimHits","TrackerHitsTIDHighTof"), cms.InputTag("g4SimHits","TrackerHitsTIDLowTof"), cms.InputTag("g4SimHits","TrackerHitsTOBHighTof"), cms.InputTag("g4SimHits","TrackerHitsTOBLowTof")),
     type = cms.string('PSimHit'),
     subdets = cms.vstring(
-        'BSCHits', 
-        'BCM1FHits',
-        'PLTHits',
-        'FP420SI', 
+       # 'BSCHits', 
+       # 'BCM1FHits',
+       # 'PLTHits',
+       # 'FP420SI', 
         'MuonCSCHits', 
         'MuonDTHits', 
         'MuonRPCHits', 
-        'TotemHitsRP', 
-        'TotemHitsT1', 
-        'TotemHitsT2Gem', 
+       # 'TotemHitsRP', 
+       # 'TotemHitsT1', 
+       # 'TotemHitsT2Gem', 
         'TrackerHitsPixelBarrelHighTof', 
         'TrackerHitsPixelBarrelLowTof', 
         'TrackerHitsPixelEndcapHighTof', 
@@ -45,26 +49,59 @@ mixSimHits = cms.PSet(
     #    'TotemHitsT1',
     #    'TotemHitsT2Gem')
 )
+
+# fastsim customs
+if eras.fastSim.isChosen():
+    mixSimHits.input = cms.VInputTag(
+        cms.InputTag("MuonSimHits","MuonCSCHits"), 
+        cms.InputTag("MuonSimHits","MuonDTHits"), 
+        cms.InputTag("MuonSimHits","MuonRPCHits"), 
+        cms.InputTag("famosSimHits","TrackerHits"))
+    mixSimHits.subdets = cms.vstring(
+        'MuonCSCHits', 
+        'MuonDTHits', 
+        'MuonRPCHits', 
+        'TrackerHits')
+
 mixCaloHits = cms.PSet(
-    input = cms.VInputTag(cms.InputTag("g4SimHits","CaloHitsTk"), cms.InputTag("g4SimHits","CastorBU"), cms.InputTag("g4SimHits","CastorFI"), cms.InputTag("g4SimHits","CastorPL"), cms.InputTag("g4SimHits","CastorTU"), 
-        cms.InputTag("g4SimHits","EcalHitsEB"), cms.InputTag("g4SimHits","EcalHitsEE"), cms.InputTag("g4SimHits","EcalHitsES"), cms.InputTag("g4SimHits","EcalTBH4BeamHits"), cms.InputTag("g4SimHits","HcalHits"), 
-        cms.InputTag("g4SimHits","HcalTB06BeamHits"), cms.InputTag("g4SimHits","ZDCHITS")),
+    input = cms.VInputTag(  # note that this list needs to be in the same order as the subdets
+        #cms.InputTag("g4SimHits","CaloHitsTk"), cms.InputTag("g4SimHits","CastorBU"), cms.InputTag("g4SimHits","CastorPL"), cms.InputTag("g4SimHits","CastorTU"), 
+        cms.InputTag("g4SimHits","CastorFI"),
+        cms.InputTag("g4SimHits","EcalHitsEB"), cms.InputTag("g4SimHits","EcalHitsEE"), cms.InputTag("g4SimHits","EcalHitsES"),
+        #cms.InputTag("g4SimHits","EcalTBH4BeamHits"), cms.InputTag("g4SimHits","HcalTB06BeamHits"),
+        cms.InputTag("g4SimHits","HcalHits"), 
+        cms.InputTag("g4SimHits","ZDCHITS")),
     type = cms.string('PCaloHit'),
     subdets = cms.vstring(
-        'CaloHitsTk', 
-        'CastorBU', 
+        #'CaloHitsTk', 
+        #'CastorBU', 
         'CastorFI', 
-        'CastorPL', 
-        'CastorTU', 
+        #'CastorPL', 
+        #'CastorTU', 
         'EcalHitsEB', 
         'EcalHitsEE', 
         'EcalHitsES', 
-        'EcalTBH4BeamHits', 
+        #'EcalTBH4BeamHits', 
         'HcalHits', 
-        'HcalTB06BeamHits', 
+        #'HcalTB06BeamHits', 
         'ZDCHITS'),
     crossingFrames = cms.untracked.vstring()
 )
+
+# fastsim customs
+if eras.fastSim.isChosen():
+    mixCaloHits.input = cms.VInputTag(
+        cms.InputTag("famosSimHits","EcalHitsEB"), 
+        cms.InputTag("famosSimHits","EcalHitsEE"), 
+        cms.InputTag("famosSimHits","EcalHitsES"), 
+        cms.InputTag("famosSimHits","HcalHits"))
+    mixCaloHits.subdets = cms.vstring(
+        'EcalHitsEB', 
+        'EcalHitsEE', 
+        'EcalHitsES', 
+        'HcalHits')
+
+
 mixSimTracks = cms.PSet(
     makeCrossingFrame = cms.untracked.bool(False),
     input = cms.VInputTag(cms.InputTag("g4SimHits")),
@@ -75,11 +112,23 @@ mixSimVertices = cms.PSet(
     input = cms.VInputTag(cms.InputTag("g4SimHits")),
     type = cms.string('SimVertex')
 )
+
+# fastsim customs
+if eras.fastSim.isChosen():
+    mixSimTracks.input = cms.VInputTag(cms.InputTag("famosSimHits"))
+    mixSimVertices.input = cms.VInputTag(cms.InputTag("famosSimHits"))
+    
 mixHepMCProducts = cms.PSet(
     makeCrossingFrame = cms.untracked.bool(False),
-    input = cms.VInputTag(cms.InputTag("generator")),
+    input = cms.VInputTag(cms.InputTag("generatorSmeared"),cms.InputTag("generator")),
     type = cms.string('HepMCProduct')
 )
+
+# reconstructed tracks for fastsim
+mixReconstructedTracks = cms.PSet(
+     input = cms.VInputTag(cms.InputTag("generalTracksBeforeMixing")),
+     type = cms.string('RecoTrack')
+     )
 
 theMixObjects = cms.PSet(
     mixCH = cms.PSet(
@@ -99,7 +148,13 @@ theMixObjects = cms.PSet(
     )
 )
 
-
+# fastsim customs
+if eras.fastSim.isChosen():
+    theMixObjects = cms.PSet(
+        theMixObjects,
+        mixRecoTracks = cms.PSet(mixReconstructedTracks)
+        )
+    
 mixPCFSimHits = cms.PSet(
     input = cms.VInputTag(cms.InputTag("CFWriter","g4SimHitsBSCHits"), cms.InputTag("CFWriter","g4SimHitsBCM1FHits"), cms.InputTag("CFWriter","g4SimHitsPLTHits"), cms.InputTag("CFWriter","g4SimHitsFP420SI"), cms.InputTag("CFWriter","g4SimHitsMuonCSCHits"), cms.InputTag("CFWriter","g4SimHitsMuonDTHits"), cms.InputTag("CFWriter","g4SimHitsMuonRPCHits"), 
         cms.InputTag("CFWriter","g4SimHitsTotemHitsRP"), cms.InputTag("CFWriter","g4SimHitsTotemHitsT1"), cms.InputTag("CFWriter","g4SimHitsTotemHitsT2Gem"), cms.InputTag("CFWriter","g4SimHitsTrackerHitsPixelBarrelHighTof"), cms.InputTag("CFWriter","g4SimHitsTrackerHitsPixelBarrelLowTof"), 

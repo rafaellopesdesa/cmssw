@@ -14,7 +14,7 @@
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDProducer.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/Utilities/interface/Exception.h"
@@ -56,7 +56,7 @@ using namespace reco;
 using namespace edm;
 using namespace std;
 
-class PFTauPrimaryVertexProducer : public EDProducer {
+class PFTauPrimaryVertexProducer final : public edm::stream::EDProducer<> {
  public:
   enum Alg{useInputPV=0, useFontPV};
 
@@ -252,11 +252,13 @@ void PFTauPrimaryVertexProducer::produce(edm::Event& iEvent,const edm::EventSetu
 // 	}
 	
 	for(std::vector<reco::TrackBaseRef>::const_iterator vtxTrkRef=thePV.tracks_begin();vtxTrkRef<thePV.tracks_end();vtxTrkRef++){
+	  bool matched = false;
 	  for (unsigned int sigTrk = 0; sigTrk < SignalTracks.size(); sigTrk++) {
-	    if((*vtxTrkRef)!=SignalTracks[sigTrk] ){
-	      nonTauTracks.push_back(**vtxTrkRef);
+	    if ( (*vtxTrkRef) == SignalTracks[sigTrk] ) {
+	      matched = true;
 	    }
-          }
+	  }
+	  if ( !matched ) nonTauTracks.push_back(**vtxTrkRef);
 	}   
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	// Refit the vertex
@@ -266,7 +268,7 @@ void PFTauPrimaryVertexProducer::produce(edm::Event& iEvent,const edm::EventSetu
 	  transTracks.push_back(transTrackBuilder->build(*iter));
 	}
 	bool FitOk(true);
-	if ( transTracks.size() >= 3 ) {
+	if ( transTracks.size() >= 2 ) {
 	  AdaptiveVertexFitter avf;
 	  avf.setWeightThreshold(0.1); //weight per track. allow almost every fit, else --> exception
 	  try {

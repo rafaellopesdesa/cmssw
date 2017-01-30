@@ -36,7 +36,7 @@
 #include "G4HCofThisEvent.hh"
 #include "CLHEP/Units/GlobalSystemOfUnits.h"
 #include "CLHEP/Units/GlobalPhysicalConstants.h"
-#include "CLHEP/Random/Random.h"
+#include "Randomize.hh"
 
 namespace CLHEP {
   class HepRandomEngine;
@@ -92,7 +92,7 @@ void HcalTB02Analysis::update(const BeginOfEvent * evt) {
 
 void HcalTB02Analysis::update(const EndOfEvent * evt) {
 
-  CLHEP::HepRandomEngine* engine = CLHEP::HepRandom::getTheEngine();
+  CLHEP::HepRandomEngine* engine = G4Random::getTheEngine();
   CLHEP::RandGaussQ  randGauss(*engine);
 
   // Look for the Hit Collection
@@ -376,6 +376,8 @@ void HcalTB02Analysis::update(const EndOfEvent * evt) {
     std::cout << " Event " << iEvt << std::endl;
   else if ((iEvt < 10000) && (iEvt%1000 == 0)) 
     std::cout << " Event " << iEvt << std::endl;
+
+  delete org;
 }
 
 void HcalTB02Analysis::fillEvent(HcalTB02HistoClass& product) {

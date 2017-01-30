@@ -11,7 +11,7 @@ class RunOnData(ConfigToolBase):
     _defaultParameters=dicttypes.SortedKeysDict()
     def __init__(self):
         ConfigToolBase.__init__(self)
-        self.addParameter(self._defaultParameters,'names',['All'], "collection name; supported are 'Photons', 'Electrons','Muons', 'Taus', 'Jets', 'METs', 'All', 'PFAll', 'PFElectrons','PFTaus','PFMuons'", allowedValues=['Photons', 'Electrons','Muons', 'Taus', 'Jets', 'METs', 'All', 'PFAll', 'PFElectrons','PFTaus','PFMuons'])
+        self.addParameter(self._defaultParameters,'names',['All'], "collection name; supported are 'Photons', 'Electrons','Muons', 'Taus', 'TausBoosted', 'Jets', 'METs', 'All', 'PFAll', 'PFElectrons','PFTaus','PFMuons'", allowedValues=['Photons', 'Electrons','Muons', 'Taus', 'TausBoosted', 'Jets', 'METs', 'All', 'PFAll', 'PFElectrons','PFTaus','PFMuons'])
         self.addParameter(self._defaultParameters,'postfix',"", "postfix of default sequence")
         self.addParameter(self._defaultParameters,'outputModules',['out'], "names of all output modules specified to be adapted (default is ['out'])")
         self._parameters=copy.deepcopy(self._defaultParameters)
@@ -68,7 +68,7 @@ class RemoveMCMatching(ConfigToolBase):
     _defaultParameters=dicttypes.SortedKeysDict()
     def __init__(self):
         ConfigToolBase.__init__(self)
-        self.addParameter(self._defaultParameters,'names',['All'], "collection name; supported are 'Photons', 'Electrons','Muons', 'Taus', 'Jets', 'METs', 'All', 'PFAll', 'PFElectrons','PFTaus','PFMuons'", allowedValues=['Photons', 'Electrons','Muons', 'Taus', 'Jets', 'METs', 'All', 'PFAll', 'PFElectrons','PFTaus','PFMuons'])
+        self.addParameter(self._defaultParameters,'names',['All'], "collection name; supported are 'Photons', 'Electrons','Muons', 'Taus', 'TausBoosted', 'Jets', 'METs', 'All', 'PFAll', 'PFElectrons','PFTaus','PFMuons'", allowedValues=['Photons', 'Electrons','Muons', 'Taus', 'TausBoosted', 'Jets', 'METs', 'All', 'PFAll', 'PFElectrons','PFTaus','PFMuons'])
         self.addParameter(self._defaultParameters,'postfix',"", "postfix of default sequence")
         self.addParameter(self._defaultParameters,'outputModules',['out'], "names of all output modules specified to be adapted (default is ['out'])")
         self._parameters=copy.deepcopy(self._defaultParameters)
@@ -116,11 +116,23 @@ class RemoveMCMatching(ConfigToolBase):
                 tauProducer.addGenJetMatch   = False
                 tauProducer.embedGenJetMatch = False
                 tauProducer.genJetMatch      = ''
+            #Boosted Taus
+            if( names[obj] == 'TausBoosted'      or names[obj] == 'All' ):
+                print "removing MC dependencies for taus boosted %s" %postfix
+                if hasattr(process, 'tauMatchBoosted'+postfix) and hasattr(process, 'patTausBoosted'+postfix) :
+                    _removeMCMatchingForPATObject(process, 'tauMatchBoosted', 'patTausBoosted', postfix)
+                    ## remove mc extra configs for taus
+                    tauProducer = getattr(process,'patTausBoosted'+postfix)
+                    tauProducer.addGenJetMatch   = False
+                    tauProducer.embedGenJetMatch = False
+                    tauProducer.genJetMatch      = ''
+                else :
+                    print "...skipped since taus boosted %s" %postfix, "are not part of process."  
             if( names[obj] == 'Jets'      or names[obj] == 'All' ):
                 print "removing MC dependencies for jets"
                 jetPostfixes = []
                 for mod in process.producerNames().split():
-                    if mod.startswith('patJets'):
+                    if mod.startswith('patJets') and getattr(process,mod).type_() == "PATJetProducer":
                         jetPostfixes.append(getattr(process, mod).label_().replace("patJets",""))
                 for pfix in jetPostfixes:
                     ## remove mc extra configs for jets
@@ -131,7 +143,10 @@ class RemoveMCMatching(ConfigToolBase):
                     jetProducer.addGenJetMatch      = False
                     jetProducer.genJetMatch         = ''
                     jetProducer.getJetMCFlavour     = False
+                    jetProducer.useLegacyJetMCFlavour = False
+                    jetProducer.addJetFlavourInfo   = False
                     jetProducer.JetPartonMapSource  = ''
+                    jetProducer.JetFlavourInfoSource = ''
                 ## adjust output
                 for outMod in outputModules:
                     if hasattr(process,outMod):
@@ -141,10 +156,12 @@ class RemoveMCMatching(ConfigToolBase):
                         raise KeyError, "process has no OutModule named", outMod
 
             if( names[obj] == 'METs'      or names[obj] == 'All' ):
-                ## remove mc extra configs for jets
-                metProducer = getattr(process, 'patMETs'+postfix)
-                metProducer.addGenMET           = False
-                metProducer.genMETSource        = ''
+                for mod in process.producerNames().split():
+                    if mod.startswith('pat') and getattr(process,mod).type_() == "PATMETProducer":
+                        ## remove mc extra configs for MET
+                        metProducer = getattr(process, mod)
+                        metProducer.addGenMET           = False
+                        metProducer.genMETSource        = ''
 
 removeMCMatching=RemoveMCMatching()
 

@@ -16,8 +16,8 @@
 
 QGSPCMS_BERT_EML::QGSPCMS_BERT_EML(G4LogicalVolumeToDDLogicalPartMap& map, 
 			   const HepPDT::ParticleDataTable * table_,
-			   sim::FieldBuilder *fieldBuilder_, 
-			   const edm::ParameterSet & p) : PhysicsList(map, table_, fieldBuilder_, p) {
+			   sim::ChordFinderSetter *chordFinderSetter_, 
+			   const edm::ParameterSet & p) : PhysicsList(map, table_, chordFinderSetter_, p) {
 
   G4DataQuestionaire it(photon);
   
@@ -35,7 +35,8 @@ QGSPCMS_BERT_EML::QGSPCMS_BERT_EML(G4LogicalVolumeToDDLogicalPartMap& map,
     RegisterPhysics( new CMSEmStandardPhysics95msc93("EM standard msc93",ver,""));
 
     // Synchroton Radiation & GN Physics
-    RegisterPhysics( new G4EmExtraPhysics(ver));
+    G4EmExtraPhysics* gn = new G4EmExtraPhysics(ver);
+    RegisterPhysics(gn);
   }
 
   // Decays
@@ -63,6 +64,6 @@ QGSPCMS_BERT_EML::QGSPCMS_BERT_EML(G4LogicalVolumeToDDLogicalPartMap& map,
   }
 
   // Monopoles
-  RegisterPhysics( new CMSMonopolePhysics(table_,fieldBuilder_,p));
+  RegisterPhysics( new CMSMonopolePhysics(table_,chordFinderSetter_,p));
 }
 

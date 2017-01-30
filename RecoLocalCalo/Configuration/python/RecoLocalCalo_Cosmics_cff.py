@@ -21,17 +21,18 @@ from RecoLocalCalo.Configuration.hcalLocalReco_cff import *
 #
 # sequence CaloLocalReco and CaloGlobalReco
 #
-calolocalreco = cms.Sequence(ecalLocalRecoSequence+hcalLocalRecoSequence)
-hbheprereco.firstSample = 1
-hbheprereco.samplesToAdd = 8
+calolocalrecoCosmics = cms.Sequence(ecalLocalRecoSequenceCosmics+hcalLocalRecoSequence)
+hbheprereco.puCorrMethod = 0 
+hbheprereco.firstSample = 0
+hbheprereco.samplesToAdd = 10
 hbheprereco.correctForTimeslew = False
 hbheprereco.correctForPhaseContainment = False
-horeco.firstSample = 1
-horeco.samplesToAdd = 8
+horeco.firstSample = 0
+horeco.samplesToAdd = 10
 horeco.correctForTimeslew = False
 horeco.correctForPhaseContainment = False
-hfreco.firstSample = 1
-hfreco.samplesToAdd = 4
+hfreco.firstSample = 0
+hfreco.samplesToAdd = 10 ### min(10,size) in the algo
 hfreco.correctForTimeslew = False
 hfreco.correctForPhaseContainment = False
 #--- special temporary DB-usage unsetting 
@@ -53,4 +54,4 @@ zdcreco.correctionPhaseNS = 10.
 # R.Ofierzynski (29.Oct.2009): add NZS sequence
 #
 from RecoLocalCalo.Configuration.hcalLocalRecoNZS_cff import *
-calolocalrecoNZS = cms.Sequence(ecalLocalRecoSequence+hcalLocalRecoSequence+hcalLocalRecoSequenceNZS) 
+calolocalrecoCosmicsNZS = cms.Sequence(ecalLocalRecoSequenceCosmics+hcalLocalRecoSequence+hcalLocalRecoSequenceNZS) 

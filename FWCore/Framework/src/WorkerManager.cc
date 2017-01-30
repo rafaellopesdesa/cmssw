@@ -5,6 +5,7 @@
 #include "FWCore/ServiceRegistry/interface/ActivityRegistry.h"
 #include "FWCore/Utilities/interface/Algorithms.h"
 #include "FWCore/Utilities/interface/ExceptionCollector.h"
+#include "FWCore/Utilities/interface/DictionaryTools.h"
 
 static const std::string kFilterType("EDFilter");
 static const std::string kProducerType("EDProducer");
@@ -12,15 +13,15 @@ static const std::string kProducerType("EDProducer");
 namespace edm {
   // -----------------------------
 
-  WorkerManager::WorkerManager(boost::shared_ptr<ActivityRegistry> areg, ExceptionToActionTable const& actions) :
+  WorkerManager::WorkerManager(std::shared_ptr<ActivityRegistry> areg, ExceptionToActionTable const& actions) :
     workerReg_(areg),
     actionTable_(&actions),
     allWorkers_(),
     unscheduled_(new UnscheduledCallProducer) {
   } // WorkerManager::WorkerManager
 
-  WorkerManager::WorkerManager(boost::shared_ptr<ModuleRegistry> modReg,
-                               boost::shared_ptr<ActivityRegistry> areg,
+  WorkerManager::WorkerManager(std::shared_ptr<ModuleRegistry> modReg,
+                               std::shared_ptr<ActivityRegistry> areg,
                                ExceptionToActionTable const& actions) :
   workerReg_(areg,modReg),
   actionTable_(&actions),
@@ -31,7 +32,7 @@ namespace edm {
   Worker* WorkerManager::getWorker(ParameterSet& pset,
                                    ProductRegistry& preg,
                                    PreallocationConfiguration const* prealloc,
-                                   boost::shared_ptr<ProcessConfiguration const> processConfiguration,
+                                   std::shared_ptr<ProcessConfiguration const> processConfiguration,
                                    std::string const & label) {
     WorkerParams params(&pset, preg, prealloc, processConfiguration, *actionTable_);
     return workerReg_.getWorker(params, label);
@@ -40,9 +41,8 @@ namespace edm {
   void WorkerManager::addToUnscheduledWorkers(ParameterSet& pset,
                                               ProductRegistry& preg,
                                               PreallocationConfiguration const* prealloc,
-                                              boost::shared_ptr<ProcessConfiguration> processConfiguration,
+                                              std::shared_ptr<ProcessConfiguration> processConfiguration,
                                               std::string label,
-                                              bool useStopwatch,
                                               std::set<std::string>& unscheduledLabels,
                                               std::vector<std::string>& shouldBeUsedLabels) {
     //Need to
@@ -55,7 +55,7 @@ namespace edm {
       unscheduledLabels.insert(label);
       unscheduled_->addWorker(newWorker);
       //add to list so it gets reset each new event
-      addToAllWorkers(newWorker, useStopwatch);
+      addToAllWorkers(newWorker);
     } else {
       shouldBeUsedLabels.push_back(label);
     }
@@ -101,8 +101,7 @@ namespace edm {
       worker->updateLookup(InEvent,*eventLookup);
     }
     
-    for_all(allWorkers_, boost::bind(&Worker::beginJob, _1));
-    loadMissingDictionaries();
+    for_all(allWorkers_, std::bind(&Worker::beginJob, std::placeholders::_1));
   }
 
   void
@@ -121,15 +120,12 @@ namespace edm {
 
   void
   WorkerManager::resetAll() {
-    for_all(allWorkers_, boost::bind(&Worker::reset, _1));
+    for_all(allWorkers_, std::bind(&Worker::reset, std::placeholders::_1));
   }
 
   void
-  WorkerManager::addToAllWorkers(Worker* w, bool useStopwatch) {
+  WorkerManager::addToAllWorkers(Worker* w) {
     if(!search_all(allWorkers_, w)) {
-      if(useStopwatch) {
-        w->useStopwatch();
-      }
       allWorkers_.push_back(w);
     }
   }
@@ -138,7 +134,7 @@ namespace edm {
   WorkerManager::setupOnDemandSystem(EventPrincipal& ep, EventSetup const& es) {
     // NOTE: who owns the productdescrption?  Just copied by value
     unscheduled_->setEventSetup(es);
-    ep.setUnscheduledHandler(unscheduled_);
+    ep.setUnscheduledHandler(unscheduled());
   }
   
 }

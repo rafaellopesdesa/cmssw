@@ -8,6 +8,7 @@
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
 #include <fstream>
+#include "Randomize.hh"
 
 //using std::cout;
 //using std::endl;
@@ -18,6 +19,7 @@ EventAction::EventAction(const edm::ParameterSet & p,
     : m_runInterface(rm),
       m_trackManager(iManager),
       m_stopFile(p.getParameter<std::string>("StopFile")),
+      m_printRandom(p.getParameter<bool>("PrintRandomSeed")),
       m_debug(p.getUntrackedParameter<bool>("debug",false))
 {
   m_trackManager->setCollapsePrimaryVertices(p.getParameter<bool>("CollapsePrimaryVertices"));
@@ -38,24 +40,26 @@ void EventAction::BeginOfEventAction(const G4Event * anEvent)
       */
       m_runInterface->abortRun(true);
     }
-
-    m_trackManager->reset();
-    BeginOfEvent e(anEvent);
-    m_beginOfEventSignal(&e);
-
+  m_trackManager->reset();
+  BeginOfEvent e(anEvent);
+  m_beginOfEventSignal(&e);
 }
 
 void EventAction::EndOfEventAction(const G4Event * anEvent)
 {
+  if(m_printRandom) 
+    {
+      edm::LogInfo("SimG4CoreApplication") << " Event " << anEvent->GetEventID()
+					   << " Random number: " << G4UniformRand();  
+      //std::cout << " Event " << anEvent->GetEventID()
+      //	<< " Random number: " << G4UniformRand() << std::endl;  
+      //CLHEP::HepRandom::showEngineStatus();
+    }
   if (std::ifstream(m_stopFile.c_str()))
     {
       edm::LogWarning("SimG4CoreApplication")
         << "EndOfEventAction: termination signal received at event "
 	<< anEvent->GetEventID();
-      /*
-        cout << "EndOfEventAction: termination signal received at event "
-             << anEvent->GetEventID() << endl;
-      */
       // soft abort run
       m_runInterface->abortRun(true);
     }
@@ -64,11 +68,6 @@ void EventAction::EndOfEventAction(const G4Event * anEvent)
       edm::LogWarning("SimG4CoreApplication")
         << "EndOfEventAction: event " << anEvent->GetEventID() 
 	<< " must have failed (no G4PrimaryVertices found) and will be skipped ";
-      /*
-        cout << " EndOfEventAction: event " << anEvent->GetEventID()
-             << " must have failed (no G4PrimaryVertices found) and will be skipped " 
-	     << endl;
-      */
       return;
     }
 
@@ -82,7 +81,8 @@ void EventAction::EndOfEventAction(const G4Event * anEvent)
   m_trackManager->cleanTkCaloStateInfoMap();
 }
 
-void EventAction::addTrack(TrackWithHistory* iTrack, bool inHistory, bool withAncestor)
+void EventAction::addTrack(TrackWithHistory* iTrack, bool inHistory, 
+			   bool withAncestor)
 {
   m_trackManager->addTrack(iTrack, inHistory, withAncestor);
 }

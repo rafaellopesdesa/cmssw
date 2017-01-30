@@ -2,17 +2,16 @@
 #include "RecoTracker/TransientTrackingRecHit/interface/TSiStripRecHit1D.h"
 #include "RecoTracker/TransientTrackingRecHit/interface/TSiStripMatchedRecHit.h"
 #include "RecoTracker/TransientTrackingRecHit/interface/TSiPixelRecHit.h"
-#include "TrackingTools/TransientTrackingRecHit/interface/InvalidTransientRecHit.h"
 #include "DataFormats/TrackingRecHit/interface/InvalidTrackingRecHit.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiStripMatchedRecHit2D.h"
 #include "DataFormats/TrackerRecHit2D/interface/ProjectedSiStripRecHit2D.h"
-#include "RecoTracker/TransientTrackingRecHit/interface/ProjectedRecHit2D.h"
 //
 // For FAMOS
 //
 #include "TrackingTools/TransientTrackingRecHit/interface/GenericTransientTrackingRecHit.h"  
-#include "DataFormats/TrackerRecHit2D/interface/SiTrackerGSRecHit2D.h"                         
-#include "DataFormats/TrackerRecHit2D/interface/SiTrackerGSMatchedRecHit2D.h"
+#include "DataFormats/TrackerRecHit2D/interface/FastTrackerRecHit.h"                         
+#include "DataFormats/TrackerRecHit2D/interface/FastMatchedTrackerRecHit.h"
+#include "DataFormats/TrackerRecHit2D/interface/FastProjectedTrackerRecHit.h"
 
 #include<iostream>
 
@@ -28,16 +27,12 @@ int main() {
 
   std::cout << std::endl;
 
-  PSIZE(TSiStripRecHit2DLocalPos);
-  PSIZE(TSiStripRecHit1D);
-  PSIZE(TSiStripMatchedRecHit);
-  PSIZE(TSiPixelRecHit);
-  PSIZE(InvalidTransientRecHit);
-  PSIZE(ProjectedRecHit2D);
   PSIZE(GenericTransientTrackingRecHit);
 
-  PSIZE(SiTrackerGSRecHit2D);
-  PSIZE(SiTrackerGSMatchedRecHit2D);
+  PSIZE(FastTrackerRecHit);
+  PSIZE(FastSingleTrackerRecHit);
+  PSIZE(FastMatchedTrackerRecHit);
+  PSIZE(FastProjectedTrackerRecHit);
 
 
 

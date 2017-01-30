@@ -4,12 +4,9 @@
 #include "FWCore/Utilities/interface/DebugMacros.h"
 #include "FWCore/Utilities/interface/DictionaryTools.h"
 #include "FWCore/Utilities/interface/TypeID.h"
-#include "Cintex/Cintex.h"
-#include "FWCore/PluginManager/interface/PluginCapabilities.h"
-
+#include "FWCore/Utilities/interface/TypeWithDict.h"
 
 #include "TClass.h"
-#include "G__ci.h"
 
 #include <string>
 #include <set>
@@ -17,15 +14,22 @@
 #include <iostream>
 
 namespace edm {
+  void loadType(TypeID const& type) {
+    TypeSet missingTypes;
+    checkClassDictionaries(type,missingTypes,true);
+    if (!missingTypes.empty()) {
+      for_all(missingTypes, loadType);
+    }
+  }
+
   void loadCap(std::string const& name) {
     FDEBUG(1) << "Loading dictionary for " << name << "\n";
-    edmplugin::PluginCapabilities::get()->load(dictionaryPlugInPrefix() + name);
-    checkDictionaries(name);
-    if (!missingTypes().empty()) {
-      StringSet missing = missingTypes();
-      missingTypes().clear();
-      for_all(missing, loadCap);
+    TypeWithDict typedict = TypeWithDict::byName(name);
+    if (!typedict) {
+      throw cms::Exception("DictionaryMissingClass") << "The dictionary of class '" << name << "' is missing!";
     }
+    TClass* cl = TClass::GetClass(name.c_str());
+    loadType(TypeID(*cl->GetTypeInfo()));
   }
 
   void doBuildRealData(std::string const& name) {
@@ -49,20 +53,12 @@ namespace edm {
 	loadCap(std::string("std::vector<edm::BranchDescription>"));
 	loadCap(std::string("edm::SendJobHeader"));
     }
-    G__SetCatchException(0);
-    ROOT::Cintex::Cintex::Enable();
     done=true;
   }
 
   namespace {
     TClass* getRootClass(std::string const& name) {
       TClass* tc = TClass::GetClass(name.c_str());    
-      
-      // get ROOT TClass for this product
-      // CINT::Type* cint_type = CINT::Type::get(typ_ref);
-      // tc_ = cint_type->rootClass();
-      // TClass* tc = TClass::GetClass(typeid(se));
-      // tc_ = TClass::GetClass("edm::SendEvent");
       
       if(tc == 0) {
 	throw edm::Exception(errors::Configuration,"getRootClass")

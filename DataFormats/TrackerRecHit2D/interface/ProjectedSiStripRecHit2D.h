@@ -3,9 +3,9 @@
 
 #include "DataFormats/TrackerRecHit2D/interface/SiStripRecHit2D.h"
 
-#include<iostream>
+// #include<iostream>
 
-class ProjectedSiStripRecHit2D : public TrackerSingleRecHit  {
+class ProjectedSiStripRecHit2D final  : public TrackerSingleRecHit  {
 public:
   
   inline static bool isMono(GeomDet const & gdet, GeomDet const & sdet) {
@@ -40,7 +40,12 @@ public:
     }
 
 
+  virtual void setDet(const GeomDet & idet);
+
+  virtual bool canImproveWithTrack() const {return true;}
+
   virtual ProjectedSiStripRecHit2D* clone() const {return new ProjectedSiStripRecHit2D( *this); }
+
   
   virtual int dimension() const {return 2;}
   virtual void getKfComponents( KfComponentsHolder & holder ) const { getKfComponents2D(holder); }
@@ -65,6 +70,18 @@ public:
     return rechits;
   }
   
+
+private:
+  // double dispatch
+  virtual ProjectedSiStripRecHit2D * clone(TkCloner const& cloner, TrajectoryStateOnSurface const& tsos) const {
+    return cloner(*this,tsos).release();
+  }
+#ifndef __GCCXML__
+  virtual  ConstRecHitPointer cloneSH(TkCloner const& cloner, TrajectoryStateOnSurface const& tsos) const {
+    return cloner.makeShared(*this,tsos);
+  }
+#endif
+
 private:
   const GeomDet* theOriginalDet;
 

@@ -42,15 +42,16 @@ from DQMOffline.RecoB.dqmAnalyzer_cff import *
 # filter/producer "pre-" sequence for globalValidation
 globalPrevalidation = cms.Sequence( 
     simHitTPAssocProducer
-  * tracksValidationSelectors
+  * tracksValidation
+  * vertexValidation
   * photonPrevalidationSequence
   * produceDenoms
-  * prebTagSequence
+  * prebTagSequenceMC
 )
 
 # filter/producer "pre-" sequence for validation_preprod
 preprodPrevalidation = cms.Sequence(
-    tracksValidationSelectors
+    tracksPreValidation
 )
 
 globalValidation = cms.Sequence(   trackerHitsValidation 
@@ -58,7 +59,6 @@ globalValidation = cms.Sequence(   trackerHitsValidation
                                  + trackerRecHitsValidation 
                                  + trackingTruthValid 
                                  + trackingRecHitsValid 
-                                 + tracksValidation 
                                  + ecalSimHitsValidationSequence 
                                  + ecalDigisValidationSequence 
                                  + ecalRecHitsValidationSequence 
@@ -77,7 +77,6 @@ globalValidation = cms.Sequence(   trackerHitsValidation
                                  + mixCollectionValidation 
                                  + JetValidation 
                                  + METValidation
-                                 + vertexValidation
                                  + egammaValidation
                                  + pfJetValidationSequence
                                  + pfMETValidationSequence
@@ -91,33 +90,32 @@ globalValidation = cms.Sequence(   trackerHitsValidation
                                  + L1Validator
 )
 
-#lite tracking validator to be used in the Validation matrix
-liteTrackValidator=trackValidator.clone()
-liteTrackValidator.label=cms.VInputTag(cms.InputTag("generalTracks"),
-                                          cms.InputTag("cutsRecoTracksHp")
-                                          )
 
+from Configuration.StandardSequences.Eras import eras
+if eras.fastSim.isChosen():
+    # fastsim has no tracker digis and different tracker rechit and simhit structure => skipp
+    globalValidation.remove(trackerHitsValidation)
+    globalValidation.remove(trackerDigisValidation)
+    globalValidation.remove(trackerRecHitsValidation)
+    globalValidation.remove(trackingRecHitsValid)
+    # globalValidation.remove(mixCollectionValidation) # can be put back, once mixing is migrated to fastsim era
+    # the following depends on crossing frame of ecal simhits, which is a bit hard to implement in the fastsim workflow
+    # besides: is this cross frame doing something, or is it a relic from the past?
+    globalValidation.remove(ecalDigisValidationSequence)
+    globalValidation.remove(ecalRecHitsValidationSequence)
+    
+#lite tracking validator to be used in the Validation matrix
 #lite validation
 globalValidationLiteTracking = cms.Sequence(globalValidation)
-globalValidationLiteTracking.replace(trackValidator,liteTrackValidator)
 
 #lite pre-validation
 globalPrevalidationLiteTracking = cms.Sequence(globalPrevalidation)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksZero)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksZeroHp)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksFirst)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksFirstHp)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksSecond)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksSecondHp)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksThird)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksThirdHp)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksFourth)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksFourthHp)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksFifth)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksFifthHp)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksSixth)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksSixthHp)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksNinth)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksNinthHp)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksTenth)
-globalPrevalidationLiteTracking.remove(cutsRecoTracksTenthHp)
+globalPrevalidationLiteTracking.replace(tracksValidation, tracksValidationLite)
+
+# Tracking-only validation
+globalPrevalidationTrackingOnly = cms.Sequence(
+      simHitTPAssocProducer
+    + tracksValidationTrackingOnly
+    + vertexValidation
+)
+globalValidationTrackingOnly = cms.Sequence()

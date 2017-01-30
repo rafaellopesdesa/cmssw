@@ -75,13 +75,22 @@ namespace cond {
     
     //
     void Session::createDatabase(){
-      m_session->openIovDb( SessionImpl::CREATE );
+      m_session->openDb();
     }
 
     IOVProxy Session::readIov( const std::string& tag, bool full ){
       m_session->openIovDb();
       IOVProxy proxy( m_session );
       proxy.load( tag, full );
+      return proxy;
+    }
+
+    IOVProxy  Session::readIov( const std::string& tag,
+                                const boost::posix_time::ptime& snapshottime,
+                                bool full ){
+      m_session->openIovDb();
+      IOVProxy proxy( m_session );
+      proxy.load( tag, snapshottime, full );
       return proxy;
     }
 
@@ -98,16 +107,28 @@ namespace cond {
 
     IOVEditor Session::createIov( const std::string& payloadType, const std::string& tag, cond::TimeType timeType, 
 				  cond::SynchronizationType synchronizationType ){
-      m_session->openIovDb( SessionImpl::CREATE );
+      m_session->openDb();
       if( m_session->iovSchema().tagTable().select( tag ) ) 
 	throwException( "The specified tag \""+tag+"\" already exist in the database.","Session::createIov");
       IOVEditor editor( m_session, tag, timeType, payloadType, synchronizationType );
       return editor;
     }
 
+    IOVEditor Session::createIov( const std::string& payloadType, 
+				  const std::string& tag, 
+				  cond::TimeType timeType,
+				  cond::SynchronizationType synchronizationType,
+				  const boost::posix_time::ptime& creationTime ){
+      m_session->openDb();
+      if( m_session->iovSchema().tagTable().select( tag ) ) 
+	throwException( "The specified tag \""+tag+"\" already exist in the database.","Session::createIov");
+      IOVEditor editor( m_session, tag, timeType, payloadType, synchronizationType, creationTime );
+      return editor;
+    }
+
     IOVEditor Session::createIovForPayload( const Hash& payloadHash, const std::string& tag, cond::TimeType timeType,
 					    cond::SynchronizationType synchronizationType ){
-      m_session->openIovDb( SessionImpl::CREATE );
+      m_session->openDb();
       if( m_session->iovSchema().tagTable().select( tag ) ) 
 	throwException( "The specified tag \""+tag+"\" already exist in the database.","Session::createIovForPayload");
       std::string payloadType("");
@@ -122,6 +143,16 @@ namespace cond {
       IOVEditor editor( m_session );
       editor.load( tag );
       return editor;
+    }
+
+    void Session::clearIov( const std::string& tag ){
+      m_session->openIovDb();
+      m_session->iovSchema().iovTable().erase( tag );      
+    }
+
+    bool Session::existsGlobalTag( const std::string& name ){
+      m_session->openGTDb();
+      return m_session->gtSchema().gtTable().select( name );    
     }
     
     GTEditor Session::createGlobalTag( const std::string& name ){
@@ -156,7 +187,7 @@ namespace cond {
     cond::Hash Session::storePayloadData( const std::string& payloadObjectType, 
 					  const std::pair<Binary,Binary>& payloadAndStreamerInfoData,
 					  const boost::posix_time::ptime& creationTime ){
-      m_session->openIovDb( SessionImpl::CREATE );
+      m_session->openDb();
       return m_session->iovSchema().payloadTable().insertIfNew( payloadObjectType, payloadAndStreamerInfoData.first, 
 								payloadAndStreamerInfoData.second, creationTime );
     }
@@ -167,22 +198,6 @@ namespace cond {
 				    cond::Binary& streamerInfoData ){
       m_session->openIovDb();
       return m_session->iovSchema().payloadTable().select( payloadHash, payloadType, payloadData, streamerInfoData );
-    }
-
-    bool Session::isOraSession(){
-      return m_session->isOra();
-    }
-    
-    bool Session::checkMigrationLog( const std::string& sourceAccount, const std::string& sourceTag, std::string& destTag ){
-      if(! m_session->iovSchema().tagMigrationTable().exists() ) m_session->iovSchema().tagMigrationTable().create();
-      //throwException( "Migration Log Table does not exist in this schema.","Session::checkMigrationLog");
-      return m_session->iovSchema().tagMigrationTable().select( sourceAccount, sourceTag, destTag );
-    }
-    
-    void Session::addToMigrationLog( const std::string& sourceAccount, const std::string& sourceTag, const std::string& destTag ){
-      if(! m_session->iovSchema().tagMigrationTable().exists() ) m_session->iovSchema().tagMigrationTable().create();
-      m_session->iovSchema().tagMigrationTable().insert( sourceAccount, sourceTag, destTag, 
-							 boost::posix_time::microsec_clock::universal_time() );
     }
 
     std::string Session::connectionString(){

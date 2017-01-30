@@ -56,6 +56,7 @@ public:
 	virtual void deserialize(Json::Value& root);
 
 	std::vector<std::string>& getData() {return data_;}
+	std::string& getDefinition() {return definition_;}
 
 	/**
 	 * Functions specific to new monitoring implementation
@@ -66,7 +67,7 @@ public:
 	//take new update for lumi
 	void snap(unsigned int lumi);
 	void snapGlobal(unsigned int lumi);
-	void snapStreamAtomic(unsigned int streamID, unsigned int lumi);
+	void snapStreamAtomic(unsigned int lumi, unsigned int streamID);
 
 	//set to track a variable
 	void trackMonitorable(JsonMonitorable *monitorable,bool NAifZeroUpdates);
@@ -98,13 +99,13 @@ public:
 	}
 
 	//fastpath (not implemented now)
-	std::string fastOutCSV();
+	std::string fastOutCSV(int sid=-1);
 
 	//pointed object should be available until discard
 	JsonMonitorable * mergeAndRetrieveValue(unsigned int forLumi);
 
 	//get everything collected prepared for output
-	void mergeAndSerialize(Json::Value& jsonRoot, unsigned int lumi, bool initJsonValue);
+	void mergeAndSerialize(Json::Value& jsonRoot, unsigned int lumi, bool initJsonValue, int sid);
 
 	//cleanup lumi
 	void discardCollected(unsigned int forLumi);
@@ -113,6 +114,8 @@ public:
 	void setNBins(unsigned int *nBins) {nBinsPtr_ = nBins;}
 
 	std::string const& getName() {return name_;}
+
+        void updateDefinition(std::string const& definition) {definition_=definition;}
 
 	// JSON field names
 	static const std::string SOURCE;

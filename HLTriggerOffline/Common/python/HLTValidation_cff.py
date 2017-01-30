@@ -1,14 +1,18 @@
+from Validation.RecoTrack.HLTmultiTrackValidator_cff import *
+from Validation.RecoVertex.HLTmultiPVvalidator_cff import *
 from HLTriggerOffline.Muon.HLTMuonVal_cff import *
 from HLTriggerOffline.Tau.Validation.HLTTauValidation_cff import *
 from HLTriggerOffline.Egamma.EgammaValidationAutoConf_cff import *
-from HLTriggerOffline.Common.FourVectorHLTriggerOffline_cff import *
 from HLTriggerOffline.HeavyFlavor.heavyFlavorValidationSequence_cff import *
 from HLTriggerOffline.JetMET.Validation.HLTJetMETValidation_cff import *
 #from HLTriggerOffline.special.hltAlCaVal_cff import *
 from HLTriggerOffline.SUSYBSM.SusyExoValidation_cff import *
 from HLTriggerOffline.Higgs.HiggsValidation_cff import *
 from HLTriggerOffline.Top.topHLTValidation_cff import *
-
+from HLTriggerOffline.B2G.b2gHLTValidation_cff import *
+from HLTriggerOffline.Exotica.ExoticaValidation_cff import *
+from HLTriggerOffline.SMP.SMPValidation_cff import *
+from HLTriggerOffline.Btag.HltBtagValidation_cff import *
 
 # offline dqm:
 # from DQMOffline.Trigger.DQMOffline_Trigger_cff.py import *
@@ -21,8 +25,12 @@ from DQMOffline.Trigger.HLTMonTau_cfi import *
  
 # additional producer sequence prior to hltvalidation
 # to evacuate producers/filters from the EndPath
-hltassociation = cms.Sequence( egammaSelectors )
-
+hltassociation = cms.Sequence(
+    hltMultiTrackValidation
+    +hltMultiPVValidation
+    +egammaSelectors
+    +ExoticaValidationProdSeq
+    )
 
 hltvalidation = cms.Sequence(
     HLTMuonVal
@@ -30,54 +38,38 @@ hltvalidation = cms.Sequence(
     +egammaValidationSequence
     +topHLTriggerOfflineDQM
     +topHLTriggerValidation
-    #+HLTFourVector
     +heavyFlavorValidationSequence
     +HLTJetMETValSeq
     +HLTSusyExoValSeq
     +HiggsValidationSequence
+    +ExoticaValidationSequence
+    +b2gHLTriggerValidation
+    +SMPValidationSequence
+    +hltbtagValidationSequence
     )
 
+# The higgs validation is not compatible with the Phase 1 pixel, so
+# take it out if that is active.
+from Configuration.StandardSequences.Eras import eras
+if eras.phase1Pixel.isChosen():
+    hltvalidation.remove(HiggsValidationSequence)
 
-# additional producer sequence prior to hltvalidation_fastsim
-# to evacuate producers from the EndPath
-hltassociation_fastsim = cms.Sequence(
-    HLTMuonAss_FastSim
-  + egammaSelectors
-  + hltTauRef
-)
-
-hltvalidation_fastsim = cms.Sequence(
-     HLTMuonVal_FastSim
-    +HLTTauValFS
-    +egammaValidationSequenceFS
-    +topHLTriggerOfflineDQM
-    +topHLTriggerValidation
-    #+HLTFourVector
-    +heavyFlavorValidationSequence
-    +HLTJetMETValSeq
-    #+HLTAlCaVal_FastSim
-    +HLTSusyExoValSeq_FastSim
-    +HiggsValidationSequence
-    )
+# some hlt collections have no direct fastsim equivalent
+# remove the dependent modules for now
+# probably it would be rather easy to add or fake these collections
+from Configuration.StandardSequences.Eras import eras
+if eras.fastSim.isChosen():
+    hltassociation.remove(hltMultiTrackValidation)
+    hltassociation.remove(hltMultiPVValidation)
 
 hltvalidation_preprod = cms.Sequence(
   HLTTauVal
-  #+HLTFourVector
   +heavyFlavorValidationSequence
   +HLTSusyExoValSeq
  #+HiggsValidationSequence
- )
-
-hltvalidation_preprod_fastsim = cms.Sequence(
- HLTTauVal
- #+HLTFourVector
- +heavyFlavorValidationSequence
- +HLTSusyExoValSeq_FastSim
-#+HiggsValidationSequence
-)
+  )
 
 hltvalidation_prod = cms.Sequence(
-  #HLTFourVector
   )
 
 trigdqm_forValidation = cms.Sequence(
@@ -89,3 +81,5 @@ hltvalidation_withDQM = cms.Sequence(
     hltvalidation
     +trigdqm_forValidation
     )
+
+    

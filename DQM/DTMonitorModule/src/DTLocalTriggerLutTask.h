@@ -19,6 +19,7 @@
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
+#include <DQMServices/Core/interface/DQMEDAnalyzer.h>
 #include "DQMServices/Core/interface/DQMStore.h"
 #include "DQMServices/Core/interface/MonitorElement.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
@@ -37,7 +38,7 @@ class DTChamberId;
 class L1MuDTChambPhDigi;
 
 
-class DTLocalTriggerLutTask: public edm::EDAnalyzer{
+class DTLocalTriggerLutTask: public DQMEDAnalyzer{
 
   friend class DTMonitorModule;
 
@@ -49,15 +50,15 @@ class DTLocalTriggerLutTask: public edm::EDAnalyzer{
   /// Destructor
   virtual ~DTLocalTriggerLutTask();
 
+  /// bookHistograms
+  void bookHistograms(DQMStore::IBooker &, edm::Run const &, edm::EventSetup const &) override;
+
  protected:
 
-  // BeginJob
-  void beginJob();
-
   ///BeginRun
-  void beginRun(const edm::Run& , const edm::EventSetup&);
+  void dqmBeginRun(const edm::Run& , const edm::EventSetup&);
 
-  /// Find best (highest qual) DCC trigger segments
+  /// Find best (highest qual) TM trigger segments
   void searchDccBest(std::vector<L1MuDTChambPhDigi> const* trigs);
 
   /// Analyze
@@ -66,16 +67,13 @@ class DTLocalTriggerLutTask: public edm::EDAnalyzer{
   /// To reset the MEs
   void beginLuminosityBlock(const edm::LuminosityBlock& lumiSeg, const edm::EventSetup& context) ;
 
-  /// EndJob
-  void endJob(void);
-
  private:
 
   /// Get the top folder
   std::string& topFolder() { return  baseFolder; }
 
   /// Book histos
-  void bookHistos(DTChamberId chId);
+  void bookHistos(DQMStore::IBooker & ibooker,DTChamberId chId);
 
  private :
 
@@ -88,14 +86,13 @@ class DTLocalTriggerLutTask: public edm::EDAnalyzer{
   bool detailedAnalysis;
   bool overUnderIn;
 
-  edm::EDGetTokenT<L1MuDTChambPhContainer> dcc_Token_;
+  edm::EDGetTokenT<L1MuDTChambPhContainer> tm_Token_;
   edm::EDGetTokenT<DTRecSegment4DCollection> seg_Token_;
 
   int trigQualBest[6][5][13];
   const L1MuDTChambPhDigi* trigBest[6][5][13];
   bool track_ok[6][5][15]; // CB controlla se serve
 
-  DQMStore* dbe;
   edm::ParameterSet parameters;
   edm::ESHandle<DTGeometry> muonGeom;
   std::string theGeomLabel;
