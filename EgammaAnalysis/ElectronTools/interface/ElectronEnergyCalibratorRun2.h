@@ -4,7 +4,7 @@
 #include <TRandom.h>
 #include "EgammaAnalysis/ElectronTools/interface/EnergyScaleCorrection_class.h"
 #include "EgammaAnalysis/ElectronTools/interface/SimpleElectron.h"
-#include "EgammaAnalysis/ElectronTools/interface/EpCombinationTool.h"
+#include "EgammaAnalysis/ElectronTools/interface/EpCombinationToolSemi.h"
 #include "FWCore/Utilities/interface/StreamID.h"
 
 
@@ -16,7 +16,7 @@ class ElectronEnergyCalibratorRun2 {
   ElectronEnergyCalibratorRun2() {}
   
   // further configuration will be added when we will learn how it will work
-  ElectronEnergyCalibratorRun2(EpCombinationTool &combinator, bool isMC, bool synchronization, std::string); 
+  ElectronEnergyCalibratorRun2(EpCombinationToolSemi &combinator, bool isMC, bool synchronization, std::string); 
   ~ElectronEnergyCalibratorRun2() ;
   
   /// Initialize with a random number generator (if not done, it will use the CMSSW service)
@@ -25,7 +25,7 @@ class ElectronEnergyCalibratorRun2 {
   
   /// Correct this electron. 
   /// StreamID is needed when used with CMSSW Random Number Generator
-  void calibrate(SimpleElectron &electron, edm::StreamID const & id = edm::StreamID::invalidStreamID()) const ;
+  void calibrate(SimpleElectron &electron, reco::GsfElectron& gsfelectron, edm::StreamID const & id = edm::StreamID::invalidStreamID()) const ;
   
   /// Correct this electron. 
   /// StreamID is needed when used with CMSSW Random Number Generator
@@ -33,7 +33,7 @@ class ElectronEnergyCalibratorRun2 {
   
  protected:    
   // whatever data will be needed
-  EpCombinationTool *epCombinationTool_;
+  EpCombinationToolSemi *epCombinationTool_;
   bool isMC_, synchronization_;
   TRandom *rng_;
   

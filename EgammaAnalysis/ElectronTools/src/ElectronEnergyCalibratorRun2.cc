@@ -4,7 +4,7 @@
 #include "FWCore/Utilities/interface/RandomNumberGenerator.h"
 #include "FWCore/Utilities/interface/Exception.h"
 
-ElectronEnergyCalibratorRun2::ElectronEnergyCalibratorRun2(EpCombinationTool &combinator, 
+ElectronEnergyCalibratorRun2::ElectronEnergyCalibratorRun2(EpCombinationToolSemi &combinator, 
 							   bool isMC, 
 							   bool synchronization, 
 							   std::string correctionFile
@@ -34,10 +34,11 @@ void ElectronEnergyCalibratorRun2::initPrivateRng(TRandom *rnd)
 void ElectronEnergyCalibratorRun2::calibrate(reco::GsfElectron &electron, unsigned int runNumber, edm::StreamID const &id) const
 {
   SimpleElectron simple(electron, runNumber, isMC_);
-  calibrate(simple, id);
+  calibrate(simple, electron);
   simple.writeTo(electron);
 }
-void ElectronEnergyCalibratorRun2::calibrate(SimpleElectron &electron, edm::StreamID const & id) const 
+
+void ElectronEnergyCalibratorRun2::calibrate(SimpleElectron &electron, reco::GsfElectron& gsfelectron, edm::StreamID const & id) const 
 {
   assert(isMC_ == electron.isMC());
   float smear = 0.0, scale = 1.0;
@@ -58,7 +59,9 @@ void ElectronEnergyCalibratorRun2::calibrate(SimpleElectron &electron, edm::Stre
   }
   electron.setNewEnergy(newEcalEnergy); 
   electron.setNewEnergyError(newEcalEnergyError);
-  epCombinationTool_->combine(electron);
+  std::pair<float, float> combinedMomentum = epCombinationTool_->combine(gsfelectron, newEcalEnergy, newEcalEnergyError);
+  electron.setCombinedMomentum(combinedMomentum.first);
+  electron.setCombinedMomentumError(combinedMomentum.second);
 }
 
 double ElectronEnergyCalibratorRun2::gauss(edm::StreamID const& id) const 
