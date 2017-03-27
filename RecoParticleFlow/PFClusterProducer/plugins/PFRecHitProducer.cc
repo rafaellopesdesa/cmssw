@@ -29,6 +29,7 @@ namespace {
   edm::ParameterSet navSet = iConfig.getParameter<edm::ParameterSet>("navigator");
 
   navigator_.reset(PFRecHitNavigationFactory::get()->create(navSet.getParameter<std::string>("name"),navSet));
+  init_ = false;
     
 }
 
@@ -42,6 +43,16 @@ namespace {
 // member functions
 //
 
+void
+ PFRecHitProducer::beginLuminosityBlock(edm::LuminosityBlock const& iLumi, const edm::EventSetup& iSetup) {
+  for( const auto& creator : creators_ ) {
+    creator->init(iSetup);
+  }
+}
+
+void
+ PFRecHitProducer::endLuminosityBlock(edm::LuminosityBlock const& iLumi, const edm::EventSetup&) { }
+
 // ------------ method called to produce the data  ------------
 void
  PFRecHitProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup)
@@ -54,9 +65,11 @@ void
 
    out->reserve(localRA1.upper());
    cleaned->reserve(localRA2.upper());
+
    for( const auto& creator : creators_ ) {
      creator->importRecHits(out,cleaned,iEvent,iSetup);
    }
+
    if (out->capacity()>2*out->size()) out->shrink_to_fit();
    if (cleaned->capacity()>2*cleaned->size()) cleaned->shrink_to_fit();
    localRA1.update(out->size());
