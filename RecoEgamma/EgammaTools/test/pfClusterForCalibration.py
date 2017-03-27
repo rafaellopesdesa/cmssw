@@ -27,6 +27,9 @@ process.load('CommonTools.RecoAlgos.pfClusterMatchedToPhotonsSelector_cfi')
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, '81X_upgrade2017_realistic_v26', '')
 
+process.MessageLogger.cerr.threshold = ''
+process.MessageLogger.cerr.FwkReport.reportEvery = 1000
+
 # This is where users have some control.
 # Define which collections to save and which dataformat we are using
 savedCollections = cms.untracked.vstring('drop *',
