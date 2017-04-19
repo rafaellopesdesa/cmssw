@@ -784,7 +784,7 @@ private:
   std::vector<unsigned int> see_nPhase2OT;
   std::vector<unsigned int> see_algo    ;
   std::vector<unsigned int> see_algoOriginal    ;
-  std::vector<int> see_trkIdx;
+  std::vector<std::vector<int> > see_trkIdx; // RCLSA: Many tracks for a single seed in GSF
   std::vector<std::vector<float> > see_shareFrac; // second index runs through matched TrackingParticles
   std::vector<std::vector<int> > see_simTrkIdx;   // second index runs through matched TrackingParticles
   std::vector<std::vector<int> > see_hitIdx;      // second index runs through hits
@@ -2307,6 +2307,7 @@ void TrackingNtuple::fillSeeds(const edm::Event& iEvent,
     if(seedTracks.empty()) 
       continue;
 
+    std::cout << "RCLSA seeds " << label.Data() << std::endl;
     // The associator interfaces really need to be fixed...
     edm::RefToBaseVector<reco::Track> seedTrackRefs;
     for(edm::View<reco::Track>::size_type i=0; i<seedTracks.size(); ++i) {
@@ -2410,8 +2411,8 @@ void TrackingNtuple::fillSeeds(const edm::Event& iEvent,
       see_dzErr   .push_back( seedFitOk ? seedTrack.dzError() : 0);
       see_algo    .push_back( algo );
       see_algoOriginal    .push_back( algoOriginal ); // RCLSA
-
-      see_trkIdx  .push_back(-1); // to be set correctly in fillTracks
+      
+      see_trkIdx  .emplace_back(); // to be set correctly in fillTracks .. RCLSA
       see_shareFrac.push_back( sharedFraction );
       see_simTrkIdx.push_back( tpIdx );
 
@@ -2946,10 +2947,10 @@ void TrackingNtuple::fillTracks(const edm::RefToBaseVector<reco::Track>& tracks,
 
       const auto seedIndex = offset->second + itTrack->seedRef().key();
       trk_seedIdx  .push_back(seedIndex);
-      if(see_trkIdx[seedIndex] != -1) {
-        throw cms::Exception("LogicError") << "Track index has already been set for seed " << seedIndex << " to " << see_trkIdx[seedIndex] << "; was trying to set it to " << iTrack;
-      }
-      see_trkIdx[seedIndex] = iTrack;
+      // if(see_trkIdx[seedIndex] != -1) {
+      //   throw cms::Exception("LogicError") << "Track index has already been set for seed " << seedIndex << " to " << see_trkIdx[seedIndex] << "; was trying to set it to " << iTrack << " " << offset->second << " " << itTrack->seedRef().key() << " " << trk_eta[iTrack-1] << " " << trk_phi[iTrack-1] << " " << trk_eta[iTrack] << " " << trk_phi[iTrack];
+      // }
+      see_trkIdx[seedIndex].push_back(iTrack);
     }
     trk_vtxIdx   .push_back(-1); // to be set correctly in fillVertices
     trk_simTrkIdx.push_back(tpIdx);
@@ -3365,12 +3366,12 @@ void TrackingNtuple::fillSuperClusters(const edm::Event& iEvent,
 	  
 	  const TrajectorySeed::range& hits = seed.recHits();
 	  size_t nhits = std::distance(hits.first,hits.second);
-	  scl_nhits_.push_back(nhits);
-	  scl_charge_.push_back(charge);
-	  scl_seedType_.push_back(seedType);
 
 	  if (nhits > 0) {
 	    auto it1 = hits.first;
+	    auto it2 = it1 + 1; bool do2 = false; if (nhits > 1) if (it2->isValid()) do2 = true;
+	    auto it3 = it2 + 1; bool do3 = false; if (nhits > 2) if (it3->isValid()) do3 = true;
+	    auto it4 = it3 + 1; bool do4 = false; if (nhits > 3) if (it4->isValid()) do4 = true;
 	    if( !it1->isValid() ) continue;
 	    auto  idx1 = std::distance(hits.first,it1);
 	    const DetId id1 = it1->geographicalId();
@@ -3398,15 +3399,16 @@ void TrackingNtuple::fillSuperClusters(const edm::Event& iEvent,
 	    if (std::abs(zVertex) > 15.) continue;
 
 	    //store first hit
+	    scl_nhits_.push_back(nhits);
+	    scl_charge_.push_back(charge);
+	    scl_seedType_.push_back(seedType);
 	    scl_dRz1_.push_back(dRz1);
 	    scl_dPhi1_.push_back(dPhi1);
 	    scl_subDet1_.push_back(subDet1);
 	    scl_lay1_.push_back(tTopo.layer(id1));
 	    GlobalPoint vertex(vprim.x(),vprim.y(),zVertex);
 	    
-	    if (nhits > 1) {
-	      auto it2 = it1 + 1;
-	      if( !it2->isValid() ) continue;
+	    if (do2) {
 	      auto idx2 = std::distance(hits.first,it2);
 	      const DetId id2 = it2->geographicalId();
 	      const GeomDet *geomdet2 = it2->det();
@@ -3414,19 +3416,22 @@ void TrackingNtuple::fillSuperClusters(const edm::Event& iEvent,
 	      FreeTrajectoryState fts2 = FTSFromVertexToPointFactory::get(*theMF, hit1Pos, vertex, energy, charge) ;
 	      const GlobalPoint& hit2Pos = it2->globalPosition();;
 	      auto tsos2 = prop2ndLayer->propagate(fts2,geomdet2->surface());
-	      if ( !tsos2.isValid() ) continue;
-	      EleRelPointPair pp2(hit2Pos,tsos2.globalParameters().position(),vertex) ;
-	      const int subDet2 = id2.subdetId();
-	      const float dRz2 = (subDet2%2==1)?pp2.dZ():pp2.dPerp();
-	      const float dPhi2 = pp2.dPhi();
-	      scl_dRz2_.push_back(dRz2);
-	      scl_dPhi2_.push_back(dPhi2);
-	      scl_subDet2_.push_back(subDet2);
-	      scl_lay2_.push_back(tTopo.layer(id2));
-
-	      if (nhits > 2) {
-		auto it3 = it2 + 1;
-		if( !it3->isValid() ) continue;
+	      if (tsos2.isValid()) { 
+		EleRelPointPair pp2(hit2Pos,tsos2.globalParameters().position(),vertex) ;
+		const int subDet2 = id2.subdetId();
+		const float dRz2 = (subDet2%2==1)?pp2.dZ():pp2.dPerp();
+		const float dPhi2 = pp2.dPhi();
+		scl_dRz2_.push_back(dRz2);
+		scl_dPhi2_.push_back(dPhi2);
+		scl_subDet2_.push_back(subDet2);
+		scl_lay2_.push_back(tTopo.layer(id2));
+	      } else {
+		scl_dRz2_.push_back(-999.);
+		scl_dPhi2_.push_back(-999.);
+		scl_subDet2_.push_back(-999.);
+		scl_lay2_.push_back(-999.);
+	      }
+	      if (do3) {
 		auto idx3 = std::distance(hits.first,it3);
 		const DetId id3 = it3->geographicalId();
 		const GeomDet *geomdet3 = it3->det();
@@ -3434,19 +3439,22 @@ void TrackingNtuple::fillSuperClusters(const edm::Event& iEvent,
 		FreeTrajectoryState fts3 = FTSFromVertexToPointFactory::get(*theMF, hit2Pos, hit1Pos, energy, charge) ;
 		const GlobalPoint& hit3Pos = it3->globalPosition();;
 		auto tsos3 = prop2ndLayer->propagate(fts3,geomdet3->surface());
-		if ( !tsos3.isValid() ) continue;
-		EleRelPointPair pp3(hit3Pos,tsos3.globalParameters().position(),vertex) ;
-		const int subDet3 = id3.subdetId();
-		const float dRz3 = (subDet3%2==1)?pp3.dZ():pp3.dPerp();
-		const float dPhi3 = pp3.dPhi();
-		scl_dRz3_.push_back(dRz3);
-		scl_dPhi3_.push_back(dPhi3);
-		scl_subDet3_.push_back(subDet3);
-		scl_lay3_.push_back(tTopo.layer(id3));
-
-		if (nhits > 3) {
-		  auto it4 = it3 + 1;
-		  if( !it4->isValid() ) continue;
+		if (tsos3.isValid()) {
+		  EleRelPointPair pp3(hit3Pos,tsos3.globalParameters().position(),vertex) ;
+		  const int subDet3 = id3.subdetId();
+		  const float dRz3 = (subDet3%2==1)?pp3.dZ():pp3.dPerp();
+		  const float dPhi3 = pp3.dPhi();
+		  scl_dRz3_.push_back(dRz3);
+		  scl_dPhi3_.push_back(dPhi3);
+		  scl_subDet3_.push_back(subDet3);
+		  scl_lay3_.push_back(tTopo.layer(id3));
+		} else {
+		  scl_dRz3_.push_back(-999.);
+		  scl_dPhi3_.push_back(-999.);
+		  scl_subDet3_.push_back(-999.);
+		  scl_lay3_.push_back(-999.);
+		}
+		if (do4) {
 		  auto idx4 = std::distance(hits.first,it4);
 		  const DetId id4 = it4->geographicalId();
 		  const GeomDet *geomdet4 = it4->det();
@@ -3454,16 +3462,21 @@ void TrackingNtuple::fillSuperClusters(const edm::Event& iEvent,
 		  FreeTrajectoryState fts4 = FTSFromVertexToPointFactory::get(*theMF, hit3Pos, hit2Pos, energy, charge) ;
 		  const GlobalPoint& hit4Pos = it4->globalPosition();
 		  auto tsos4 = prop2ndLayer->propagate(fts4,geomdet4->surface());
-		  if ( !tsos4.isValid() ) continue;
-		  EleRelPointPair pp4(hit4Pos,tsos4.globalParameters().position(),vertex) ;
-		  const int subDet4 = id4.subdetId();
-		  const float dRz4 = (subDet4%2==1)?pp4.dZ():pp4.dPerp();
-		  const float dPhi4 = pp4.dPhi();
-		  scl_dRz4_.push_back(dRz4);
-		  scl_dPhi4_.push_back(dPhi4);
-		  scl_subDet4_.push_back(subDet4);
-		  scl_lay4_.push_back(tTopo.layer(id4));
-		
+		  if ( tsos4.isValid() ) {
+		    EleRelPointPair pp4(hit4Pos,tsos4.globalParameters().position(),vertex) ;
+		    const int subDet4 = id4.subdetId();
+		    const float dRz4 = (subDet4%2==1)?pp4.dZ():pp4.dPerp();
+		    const float dPhi4 = pp4.dPhi();
+		    scl_dRz4_.push_back(dRz4);
+		    scl_dPhi4_.push_back(dPhi4);
+		    scl_subDet4_.push_back(subDet4);
+		    scl_lay4_.push_back(tTopo.layer(id4));
+		  } else {
+		    scl_dRz4_.push_back(-999.);
+		    scl_dPhi4_.push_back(-999.);
+		    scl_subDet4_.push_back(-999.);
+		    scl_lay4_.push_back(-999.);
+		  }
 		} else {
 		  scl_dRz4_.push_back(-999.);
 		  scl_dPhi4_.push_back(-999.);
@@ -3497,18 +3510,26 @@ void TrackingNtuple::fillSuperClusters(const edm::Event& iEvent,
 	  }
 	}
       }
-    }   
+    } 
     scl_charge.push_back(scl_charge_);
     scl_seedType.push_back(scl_seedType_);
     scl_nhits.push_back(scl_nhits_);
     scl_lay1.push_back(scl_lay1_);
     scl_lay2.push_back(scl_lay2_);
+    scl_lay3.push_back(scl_lay3_);
+    scl_lay4.push_back(scl_lay4_);
     scl_subDet1.push_back(scl_subDet1_);
     scl_subDet2.push_back(scl_subDet2_);
+    scl_subDet3.push_back(scl_subDet3_);
+    scl_subDet4.push_back(scl_subDet4_);
     scl_dRz1.push_back(scl_dRz1_);
     scl_dPhi1.push_back(scl_dPhi1_);
     scl_dRz2.push_back(scl_dRz2_);
     scl_dPhi2.push_back(scl_dPhi2_);
+    scl_dRz3.push_back(scl_dRz3_);
+    scl_dPhi3.push_back(scl_dPhi3_);
+    scl_dRz4.push_back(scl_dRz4_);
+    scl_dPhi4.push_back(scl_dPhi4_);
 
   }
 
